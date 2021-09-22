@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -27,6 +28,10 @@ namespace Json.Schema
 		/// </summary>
 		public JsonSchema Schema { get; }
 
+		static ContainsKeyword()
+		{
+			ValidationContext.RegisterConsolidationMethod(ConsolidateAnnotations);
+		}
 		/// <summary>
 		/// Creates a new <see cref="ContainsKeyword"/>.
 		/// </summary>
@@ -42,13 +47,16 @@ namespace Json.Schema
 		/// <param name="context">Contextual details for the validation process.</param>
 		public void Validate(ValidationContext context)
 		{
+			context.EnterKeyword(Name);
 			if (context.LocalInstance.ValueKind != JsonValueKind.Array)
 			{
+				context.WrongValueKind(context.LocalInstance.ValueKind);
 				context.IsValid = true;
 				return;
 			}
 
 			var count = context.LocalInstance.GetArrayLength();
+			var validIndices = new List<int>();
 			for (int i = 0; i < count; i++)
 			{
 				var subContext = ValidationContext.From(context,
@@ -56,18 +64,34 @@ namespace Json.Schema
 					context.LocalInstance[i]);
 				Schema.ValidateSubschema(subContext);
 				context.NestedContexts.Add(subContext);
+				if (subContext.IsValid)
+					validIndices.Add(i);
 			}
 
-			var found = context.NestedContexts.Count(r => r.IsValid);
-			var minContainsKeyword = context.LocalSchema.Keywords.OfType<MinContainsKeyword>().FirstOrDefault();
+			var minContainsKeyword = context.LocalSchema.Keywords!.OfType<MinContainsKeyword>().FirstOrDefault();
 			if (minContainsKeyword != null && minContainsKeyword.Value == 0)
 				context.IsValid = true;
 			else
-				context.IsValid = found != 0;
+				context.IsValid = validIndices.Any();
 			if (context.IsValid)
-				context.SetAnnotation(Name, found);
+				context.SetAnnotation(Name, validIndices);
 			else
 				context.Message = "Expected array to contain at least one item that matched the schema, but it did not";
+			context.ExitKeyword(Name, context.IsValid);
+		}
+
+		private static void ConsolidateAnnotations(IEnumerable<ValidationContext> sourceContexts, ValidationContext destContext)
+		{
+			var allIndices = sourceContexts.Select(c => c.TryGetAnnotation(Name))
+				.Where(a => a != null)
+				.Cast<List<int>>()
+				.SelectMany(a => a)
+				.Distinct()
+				.ToList();
+			if (destContext.TryGetAnnotation(Name) is List<int> annotation)
+				annotation.AddRange(allIndices);
+			else if (allIndices.Any())
+				destContext.SetAnnotation(Name, allIndices);
 		}
 
 		IRefResolvable? IRefResolvable.ResolvePointerSegment(string? value)

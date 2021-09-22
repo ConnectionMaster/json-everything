@@ -48,7 +48,18 @@ namespace Json.Patch
 		/// <returns>An `add` operation.</returns>
 		public static PatchOperation Add(JsonPointer path, JsonElement value)
 		{
-			return new PatchOperation(OperationType.Add, default, path, value, AddOperationHandler.Instance);
+			return new PatchOperation(OperationType.Add, JsonPointer.Empty, path, value, AddOperationHandler.Instance);
+		}
+
+		/// <summary>
+		/// Creates an `add` operation.
+		/// </summary>
+		/// <param name="path">The source path.</param>
+		/// <param name="value">The value to add.</param>
+		/// <returns>An `add` operation.</returns>
+		public static PatchOperation Add(JsonPointer path, JsonElementProxy value)
+		{
+			return new PatchOperation(OperationType.Add, JsonPointer.Empty, path, value, AddOperationHandler.Instance);
 		}
 
 		/// <summary>
@@ -58,7 +69,7 @@ namespace Json.Patch
 		/// <returns>An `remove` operation.</returns>
 		public static PatchOperation Remove(JsonPointer path)
 		{
-			return new PatchOperation(OperationType.Remove, default, path, default, RemoveOperationHandler.Instance);
+			return new PatchOperation(OperationType.Remove, JsonPointer.Empty, path, default, RemoveOperationHandler.Instance);
 		}
 
 		/// <summary>
@@ -69,7 +80,18 @@ namespace Json.Patch
 		/// <returns>An `replace` operation.</returns>
 		public static PatchOperation Replace(JsonPointer path, JsonElement value)
 		{
-			return new PatchOperation(OperationType.Replace, default, path, value, ReplaceOperationHandler.Instance);
+			return new PatchOperation(OperationType.Replace, JsonPointer.Empty, path, value, ReplaceOperationHandler.Instance);
+		}
+
+		/// <summary>
+		/// Creates an `replace` operation.
+		/// </summary>
+		/// <param name="path">The source path.</param>
+		/// <param name="value">The value to add.</param>
+		/// <returns>An `replace` operation.</returns>
+		public static PatchOperation Replace(JsonPointer path, JsonElementProxy value)
+		{
+			return new PatchOperation(OperationType.Replace, JsonPointer.Empty, path, value, ReplaceOperationHandler.Instance);
 		}
 
 		/// <summary>
@@ -102,7 +124,18 @@ namespace Json.Patch
 		/// <returns>An `test` operation.</returns>
 		public static PatchOperation Test(JsonPointer path, JsonElement value)
 		{
-			return new PatchOperation(OperationType.Test, default, path, value, TestOperationHandler.Instance);
+			return new PatchOperation(OperationType.Test, JsonPointer.Empty, path, value, TestOperationHandler.Instance);
+		}
+
+		/// <summary>
+		/// Creates an `test` operation.
+		/// </summary>
+		/// <param name="path">The source path.</param>
+		/// <param name="value">The value to match.</param>
+		/// <returns>An `test` operation.</returns>
+		public static PatchOperation Test(JsonPointer path, JsonElementProxy value)
+		{
+			return new PatchOperation(OperationType.Test, JsonPointer.Empty, path, value, TestOperationHandler.Instance);
 		}
 
 		internal void Handle(PatchContext context)
@@ -118,7 +151,9 @@ namespace Json.Patch
 			return Op == other.Op &&
 			       From.Equals(other.From) &&
 			       Path.Equals(other.Path) &&
-			       Value.IsEquivalentTo(other.Value);
+			       ((Value.ValueKind == JsonValueKind.Undefined &&
+			         other.Value.ValueKind == JsonValueKind.Undefined) ||
+			        Value.IsEquivalentTo(other.Value));
 		}
 
 		/// <summary>Indicates whether this instance and a specified object are equal.</summary>

@@ -13,11 +13,16 @@ namespace Json.Schema.Generation
 		private static readonly List<ISchemaGenerator> _generators =
 			new List<ISchemaGenerator>
 			{
+				new NullableValueTypeSchemaGenerator(),
 				new BooleanSchemaGenerator(),
 				new IntegerSchemaGenerator(),
 				new NumberSchemaGenerator(),
 				new StringSchemaGenerator(),
 				new EnumGenerator(),
+				new DateTimeSchemaGenerator(),
+				new GuidSchemaGenerator(),
+				new JsonPointerSchemaGenerator(),
+				new UriSchemaGenerator(),
 				// the dictionary ones are enumerable, so they need to come before the array one
 				new StringDictionarySchemaGenerator(),
 				new EnumDictionarySchemaGenerator(),

@@ -2,7 +2,7 @@
 
 JsonSchema.Net.Generation is an extension package to [JsonSchema.Net](https://www.nuget.org/packages/JsonSchema.Net/) that provides JSON Schema generation from .Net types.
 
-Using it is quite simple.  First you need a `JsonSchemaBulider`.  Then...
+Using it is quite simple.  First you need a `JsonSchemaBuilder`.  Then...
 
 ```c#
 var schema = schemaBuilder.FromType<MyType>().Build();
@@ -37,8 +37,17 @@ All of these and more are supplied via a set of attributes that can be applied t
     - `MaxItems`
     - `UniqueItems`
 - All
-    - `Required`
-    - `Obsolete` (translates to `deprecated`)
+    - `Required` & `Nullable` (see below)
+    - `Obsolete`\* (translates to `deprecated`)
+    - `JsonExclude`\*\*
+    - `Title`
+    - `Description`
+    - `ReadOnly`
+    - `WriteOnly`
+
+\* The `[Obsolete]` attribute is `System.Obsolete`.  All of the others have been defined within this library.  `System.ComponentModel.DataAnnotations` support is currently [in discussion](https://github.com/gregsdennis/json-everything/issues/143).
+
+\*\* The `[JsonExclude]` attribute functions equivalently to `[JsonIgnore]` (see below).  It is included to allow generation to skip a property while allowing serialization to consider it.
 
 Simply add the attributes directly to the properties and the corresponding keywords will be added to the schema.
 
@@ -77,6 +86,14 @@ The `minimum` is applied to the `items` because that keyword is not relevant for
 
 ***NOTE** This means that the generator will have trouble determining where to apply keywords to properties like `List<List<T>>` because the attributes could be relevant for both the outer and inner lists.*
 
+The generator also supports these .Net-defined attributes:
+
+- `JsonPropertyName` - supports custom property naming (more on naming below)
+- `JsonNumberHandling`\* - supports allowing numeric values in strings or only as numbers as well as allowing the `NaN`, `Infinity`, and `-Infinity` values.
+- `JsonIgnore`\* - ignores a property
+
+\* These attributes were introduced with .Net 5.  The .Net Standard version of the library also provides a definition for them.
+
 The generator will handle most common types:
 
 - numeric types (`int`, `decimal`, etc.)
@@ -94,6 +111,44 @@ The generator will handle most common types:
 
 For POCOs, currently only read/write properties are converted.  Future versions of this library may also support read-only or write-only by adding the `readOnly` and `writeOnly` keywords, respectively.
 
+Lastly, property names will either be listed as declared in code (default) or sorted by name.  This is controlled via the `SchemaGenerationConfiguration.PropertyOrder` property.
+
+### Nullability
+
+There is a discrepancy between how .Net does validation and how JSON Schema does validation that centers primarily around nullable types and the `[Required]` attribute.
+
+Those familiar with .Net validation will recognize that having `[Required]` on your models will also protect against null values when deserializing.  However, JSON Schema separates these two concepts, and this library strives to align with JSON Schema in order to give the most flexibility.
+
+To this end, the `[Required]` attribute will only be represented in generated schemas in the `required` keyword.
+
+However, for nullable types, it may or may not be appropriate to include `null` in the `type` keyword.  JsonSchema.Net.Generation controls this behavior via the `SchemaGenerationConfiguration.Nullability` option with individual properties being overrideable via the `[Nullable(bool)]` attribute.
+
+There are four options:
+
+- `Disabled` - This is the default.  The resulting schemas will not have `null` in the `type` keyword unless `[Nullable(true)]` is used.
+- `AllowForNullableValueTypes` - This will add `null` to the `type` keyword for nullable value types (i.e. `Nullable<T>`) unless `[Nullable(false)]` is used.
+- `AllowForReferenceTypes` - This will add `null` to the `type` keyword for reference types unless `[Nullable(false)]` is used.
+- `AllowForAllTypes` - This is a combination of the previous two and will add `null` to the type keyword for any type unless `[Nullable(false)]` is used.
+
+***NOTE** This library [cannot detect](https://stackoverflow.com/a/62186551/878701) whether the consuming code has nullable reference types enabled.  Therefore all reference types are considered nullable.*
+
+***BONUS NOTE** The library makes a distinction between nullable value types and reference types because value types must be explicitly nullable.  This differs from reference types which are implicitly nullable, and there's not a way (via the type itself) to make a reference type non-nullable.*
+
+### Property naming
+
+In addition to the `[JsonPropertyName]` attribute, the configuration exposes a `PropertyNamingMethod` that allows you to define a custom method for altering property names from your code into the schema.  The `PropertyNamingMethods` static class defines a few commonly-used conventions:
+
+- `camelCase`
+- `PascalCase`
+- `kebab-case`
+- `UPPER-KEBAB-CASE`
+- `snake_case`
+- `UPPER_SNAKE_CASE`
+
+Just set this property and the system will adjust property names accordingly.
+
+Note that the `[JsonPropertyName]` attribute takes precedence, so you can still use this to get custom naming when you've configured a method.
+
 ### Additional built-in support
 
 There are a couple advanced features that bear mentioning.
@@ -105,11 +160,12 @@ There are a couple advanced features that bear mentioning.
 
 The above will work most of the time, but occasionally you may find that you need some additional support.  Happily, the library is configured for you to provide that support yourself.
 
-There are three areas that can be augmented in order to get the results you're after.
+There are four areas that can be utilized in order to get the results you're after.
 
 - Generators
 - Intents
 - Attributes
+- Refiners
 
 These do not _all_ need to be implemented.
 
@@ -157,7 +213,7 @@ Most intents are pretty simple to implement.  Here's the `TypeIntent` from above
 ```c#
 public class TypeIntent : ISchemaKeywordIntent
 {
-    public SchemaValueType Type { get; }
+    public SchemaValueType Type { get; set; }
 
     public TypeIntent(SchemaValueType type)
     {
@@ -269,6 +325,19 @@ The `AddConstraints()` method works exactly the same as in the generator class. 
 ***NOTE** `.IsNumber()` is an extension method on `Type` that determines if it's a numeric type.  There are a few more of these helper extensions as well.*
 
 The occasion may arise where you want to handle an attribute that's defined in some other assembly, and you can't make it implement `IAttributeHandler`.  For these cases, just implement the handler class, and then add it using one of the `AttributeHandler.AddHandler()` static methods.  A handler can be removed using the `AttributeHandler.RemoveHandler<T>()` static method.
+
+### Refiners
+
+Sometimes you may need to make minor adjustments to the generated schemas dynamically.  For this you'll need to create an implementation of `ISchemaRefiner`.
+
+Refiners are called after all intents have been generated for each type, recursively, throughout the process.
+
+To implement a refiner, two methods will be needed:
+
+- `bool ShouldRun(SchemaGenerationContext)` which determines whether the refiner needs to run for the current generation iteration.
+- `void Run(SchemaGenerationContext)` which makes whatever modifications are needed.
+
+Remember that a this point, you're stil working with intents.  You can add new ones as well as modify or remove existing ones.  You really have complete freedom within a refiner.
 
 ## That's it
 

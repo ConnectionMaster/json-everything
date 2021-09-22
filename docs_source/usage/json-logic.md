@@ -4,6 +4,10 @@
 
 [JsonLogic](https://jsonlogic.com) is a mechanism that can be used to apply logical transformations to JSON values and that is also itself expressed in JSON.
 
+<p style="text-align: center;">
+<a href="https://json-everything.net/json-logic" target="_block" style="color: rgb(255, 255, 255); background-color: rgb(13, 71, 161); display: inline-block; font-weight: 500; font-size: 2rem; text-align: center; vertical-align: middle; padding: 0.6rem 0.9rem; border-radius: 0.35rem; cursor: pointer; user-select: none; text-decoration: none; --darkreader-inline-color:#ffffff; --darkreader-inline-bgcolor:#06419c; margin-top: 1.5rem !important;">Try it online!</a>
+</p>
+
 ## The syntax
 
 JsonLogic is expressed using single-keyed objects called _rules_.  The key is the operator and the value is (usually) an array containing the parameters for the operation.  Here are a few examples:
@@ -91,6 +95,16 @@ Nested arrays are flattened before being operated upon.  As an example of this, 
 
 That's it.  Not much to it; just be aware that it happens.
 
-## Creating new rules
+## Creating new operators
 
-[Adding new operations](https://jsonlogic.com/add_operation.html) is currently supported in the Javascript implementation, and it's coming soon here.  The initial version only supports the predefined operations.
+JSON Logic also supports [adding custom operations](https://jsonlogic.com/add_operation.html).
+
+In C#, your operators will need to derive from the `Rule` abstract class.  There is only a single method to implement, `Apply()`, and you'll need to add an `Operator` attribute.  The logic in the rule doesn't need to be complex, but there are a couple things to be aware of:
+
+- Your rule must have a parameterless constructor.
+- You're working with `JsonElement`s, so you'll need to detect compatible value types.  There are a few extension methods that you can use, like `.Numberify()`, that try to "fuzzy-cast" to a numberish value.
+- If you encounter invalid input, throw a `JsonLogicException` with an appropriate message.
+
+It's definitely recommended to go through the [code for the built-in ruleset](https://github.com/gregsdennis/json-everything/tree/master/JsonLogic/Rules) for examples.
+
+Once your rule is defined, it needs to be registered using the `RuleRegistry.Register<T>()` method.  This will allow the rule to be automatically deserialized.

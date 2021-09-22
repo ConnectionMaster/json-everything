@@ -4,11 +4,11 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <RootNamespace>Json.Patch</RootNamespace>
-    <Version>1.0.4</Version>
+    <Version>1.1.0</Version>
     <PackageId>JsonPatch.Net</PackageId>
     <Authors>Greg Dennis</Authors>
     <Company>Greg Dennis</Company>
-    <Product>JsonPatch.Net</Product>
+		<AssemblyName>JsonPatch.Net</AssemblyName>
     <Description>JSON Patch built on the System.Text.Json namespace.</Description>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageProjectUrl>https://github.com/gregsdennis/json-everything</PackageProjectUrl>
@@ -18,7 +18,7 @@
     <PackageIcon>json-logo-256.png</PackageIcon>
     <PackageReleaseNotes>https://gregsdennis.github.io/json-everything/release-notes/json-patch.html</PackageReleaseNotes>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.4.0</FileVersion>
+    <FileVersion>1.1.0.0</FileVersion>
     <DocumentationFile>JsonPatch.xml</DocumentationFile>
 	  <IncludeSymbols>true</IncludeSymbols>
 	  <SymbolPackageFormat>snupkg</SymbolPackageFormat>

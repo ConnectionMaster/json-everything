@@ -40,8 +40,10 @@ namespace Json.Schema
 		/// <param name="context">Contextual details for the validation process.</param>
 		public void Validate(ValidationContext context)
 		{
+			context.EnterKeyword(Name);
 			context.SetAnnotation(Name, Value);
 			context.IsValid = true;
+			context.ExitKeyword(Name, context.IsValid);
 		}
 
 		/// <summary>Indicates whether the current object is equal to another object of the same type.</summary>
@@ -74,7 +76,8 @@ namespace Json.Schema
 	{
 		public override DefaultKeyword Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 		{
-			var element = JsonDocument.ParseValue(ref reader).RootElement;
+			using var document = JsonDocument.ParseValue(ref reader);
+			var element = document.RootElement;
 
 			return new DefaultKeyword(element);
 		}

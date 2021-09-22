@@ -1,10 +1,12 @@
 ﻿ using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Json.Schema.Generation.Intents;
+ using Json.Schema.Generation.Refiners;
 
-namespace Json.Schema.Generation
+ namespace Json.Schema.Generation
 {
 	/// <summary>
 	/// Provides meta-data about the generation process.
@@ -23,6 +25,8 @@ namespace Json.Schema.Generation
 			}
 		}
 
+		private IComparer<MemberInfo>? _memberInfoComparer;
+
 		/// <summary>
 		/// The CLR type currently being processed.
 		/// </summary>
@@ -35,36 +39,52 @@ namespace Json.Schema.Generation
 		/// The current set of keyword intents.
 		/// </summary>
 		public List<ISchemaKeywordIntent> Intents { get; } = new List<ISchemaKeywordIntent>();
+		/// <summary>
+		/// The generator configuration.
+		/// </summary>
+		public SchemaGeneratorConfiguration Configuration { get; }
+		
+		internal IComparer<MemberInfo> DeclarationOrderComparer => _memberInfoComparer ??= new MemberInfoMetadataTokenComparer(Type);
 
-		internal SchemaGeneratorContext(Type type, List<Attribute> attributes)
+		internal SchemaGeneratorContext(Type type, List<Attribute> attributes, SchemaGeneratorConfiguration configuration)
 		{
 			Type = type;
 			Attributes = attributes;
+			Configuration = configuration;
 		}
 
 		internal void GenerateIntents()
 		{
-			var generator = GeneratorRegistry.Get(Type);
+			var generator = Configuration.Generators.FirstOrDefault(x => x.Handles(Type)) ?? GeneratorRegistry.Get(Type);
 			generator?.AddConstraints(this);
 
 			AttributeHandler.HandleAttributes(this);
+
+			var refiners = Configuration.Refiners.ToList();
+			refiners.Add(NullabilityRefiner.Instance);
+			foreach (var refiner in refiners.Where(x => x.ShouldRun(this)))
+			{
+				refiner.Run(this);
+			}
 		}
 
 		internal void Optimize()
 		{
 			var thisHash = GetHashCode();
 			var allContexts = GetChildContexts();
-			var defsByHashCode = allContexts.Where(g => g.Value.Count > 1)
+			var defsByHashCode = allContexts.Where(g => g.Value.Count > 1 &&
+			                                            (g.Value.Context.Intents.Count != 1 ||
+			                                            !(g.Value.Context.Intents[0] is TypeIntent)))
 				.ToDictionary(g => g.Key, g => g.Value.Context);
 
 			var currentNames = new List<string>();
 			var defs = new Dictionary<string, SchemaGeneratorContext>();
-			var contextContainers = Intents.OfType<IContextContainer>().ToList();
+			var contextContainers = GetNestedContainers().ToList();
 			foreach (var def in defsByHashCode)
 			{
 				var name = def.Value.GetDefName(currentNames);
 				var refIntent = new RefIntent(new Uri(def.Key == thisHash ? "#" : $"#/$defs/{name}", UriKind.Relative));
-				var refContext = new SchemaGeneratorContext(def.Value.Type, null!);
+				var refContext = new SchemaGeneratorContext(def.Value.Type, null!, Configuration);
 				refContext.Intents.Add(refIntent);
 				foreach (var intent in contextContainers)
 				{
@@ -79,6 +99,24 @@ namespace Json.Schema.Generation
 				var defsIntent = new DefsIntent(defs);
 				Intents.Add(defsIntent);
 			}
+		}
+
+		private IEnumerable<IContextContainer> GetNestedContainers()
+		{
+			var contextContainers = Intents.OfType<IContextContainer>().ToList();
+			var i = 0;
+
+			while (i < contextContainers.Count)
+			{
+				var current = contextContainers[i];
+				var unknownContainers = current.GetContexts()
+					.SelectMany(c => c.Intents.OfType<IContextContainer>())
+					.Except(contextContainers);
+				contextContainers.AddRange(unknownContainers);
+				i++;
+			}
+
+			return contextContainers;
 		}
 
 		private string GetDefName(List<string> currentNames)
@@ -96,6 +134,7 @@ namespace Json.Schema.Generation
 		private static string GetName(Type type)
 		{
 			if (type.IsInteger()) return "integer";
+			if (type.IsNumber()) return "number";
 			if (type == typeof(string)) return "string";
 			if (type.IsArray()) return "array";
 			if (type == typeof(bool)) return "boolean";

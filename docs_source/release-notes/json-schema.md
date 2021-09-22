@@ -1,6 +1,68 @@
-# [1.9.2](https://github.com/gregsdennis/json-everything/pull/83)
+# [1.11.3](https://github.com/gregsdennis/json-everything/pull/166)
 
-[#82](https://github.com/gregsdennis/json-everything/pulll/82) - Fixing issues managing `ValidationContext.CurrentUri`.  Credit to [@amosonn](https://github.com/amosonn).
+[#1165](https://github.com/gregsdennis/json-everything/issues/165) - [@pbajrak](https://github.com/pbajrak) discovered a copy/paste error in the message for `minProperties`.
+
+# [1.11.2](https://github.com/gregsdennis/json-everything/pull/157)
+
+Fixed minor issue with `$dynamicRef`/`$dynamicAnchor` and resolution within specific scopes.
+
+# [1.11.1](https://github.com/gregsdennis/json-everything/pull/156)
+
+Some `format` validations were incorrectly failing validations for incompatible types.  For example, `uri` would fail on integers, but should pass (ignore non-strings).
+
+# [1.11.0](https://github.com/gregsdennis/json-everything/pull/155)
+
+`format` incorporates error messages from custom format validation, when provided.
+
+# [1.10.8](https://github.com/gregsdennis/json-everything/pull/152)
+
+`format` now adds an error message.
+
+# [1.10.7](https://github.com/gregsdennis/json-everything/pull/145)
+
+Revenge of [#138](https://github.com/gregsdennis/json-everything/issues/138) - [@yohny](https://github.com/yohny) found that the initialization issue still existed when not supplying custom validation options.
+
+# [1.10.6](https://github.com/gregsdennis/json-everything/pull/140)
+
+[#138](https://github.com/gregsdennis/json-everything/issues/138) - [@wazzamatazz](https://github.com/wazzamatazz) found an initialization issue that resulted in a `NullReferenceException`.
+
+# [1.10.5](https://github.com/gregsdennis/json-everything/pull/135)
+
+Fixed an issue with reference resolution when `$ref` and `$id` are sibling keywords in drafts 6 and 7.
+
+# [1.10.4](https://github.com/gregsdennis/json-everything/pull/133)
+
+[#132](https://github.com/gregsdennis/json-everything/pull/132) - Fixed some memory management issues around `JsonDocument` and `JsonElement`.  Thanks to [@ddunkin](https://github.com/ddunkin) for finding and fixing these.
+
+# [1.10.3](https://github.com/gregsdennis/json-everything/pull/120)
+
+Added overload for `ExitKeyword` logging extension to pull the validition result from the context rather than having to pass it in.
+
+# [1.10.2](https://github.com/gregsdennis/json-everything/pull/102)
+
+In 2020-12, `unevaluatedItems` should consider `contains`.
+
+# [1.10.1](https://github.com/gregsdennis/json-everything/pull/98)
+
+[#97](https://github.com/gregsdennis/json-everything/issues/97) - Added support for circular reference detection.
+
+# [1.10.0](https://github.com/gregsdennis/json-everything/pull/93)
+
+[#90](https://github.com/gregsdennis/json-everything/issues/90) - Added `JsonSchemaBuilder.Get<T>()` to support the discussion around incrementally adding properties while building schemas.
+
+Added optional logging around schema processing decisions.
+
+# [1.9.4](https://github.com/gregsdennis/json-everything/pull/92)
+
+Register the 2020-12 meta-schemas and vocabularies.
+
+Fixed several issues with reusing options objects between validations.
+
+Fixed `$dynamic*` keywords based on new tests in test suite.
+
+# [1.9.3](https://github.com/gregsdennis/json-everything/pull/83)
+
+[#82](https://github.com/gregsdennis/json-everything/pull/82) - Fixing issues managing `ValidationContext.CurrentUri`.  Credit to [@amosonn](https://github.com/amosonn).
 
 # [1.9.2](https://github.com/gregsdennis/json-everything/pull/80)
 

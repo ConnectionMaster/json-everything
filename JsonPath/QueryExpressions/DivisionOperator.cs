@@ -14,7 +14,7 @@ namespace Json.Path.QueryExpressions
 			return QueryExpressionType.Invalid;
 		}
 
-		public JsonElement Evaluate(QueryExpressionNode left, QueryExpressionNode right, JsonElement element)
+		public JsonElementProxy Evaluate(QueryExpressionNode left, QueryExpressionNode right, JsonElement element)
 		{
 			var rElement = right.Evaluate(element);
 			if (rElement.ValueKind != JsonValueKind.Number) return default;
@@ -22,12 +22,15 @@ namespace Json.Path.QueryExpressions
 			if (rValue == 0) return default;
 			var lElement = left.Evaluate(element);
 			if (lElement.ValueKind != JsonValueKind.Number) return default;
-			return (lElement.GetDecimal() / rValue).AsJsonElement();
+			return lElement.GetDecimal() / rValue;
 		}
 
 		public string ToString(QueryExpressionNode left, QueryExpressionNode right)
 		{
-			return $"{left}/{right}";
+			var lString = left.MaybeAddParentheses(OrderOfOperation);
+			var rString = right.MaybeAddParentheses(OrderOfOperation, true);
+
+			return $"{lString}/{rString}";
 		}
 	}
 }

@@ -2,6 +2,10 @@
 
 [JSON Pointer](https://tools.ietf.org/html/rfc6901) is a mechanism that allows you to isolate a single element within a JSON document by navigating down a series of object properties and array indices.
 
+<p style="text-align: center;">
+<a href="https://json-everything.net/json-pointer" target="_block" style="color: rgb(255, 255, 255); background-color: rgb(13, 71, 161); display: inline-block; font-weight: 500; font-size: 2rem; text-align: center; vertical-align: middle; padding: 0.6rem 0.9rem; border-radius: 0.35rem; cursor: pointer; user-select: none; text-decoration: none; --darkreader-inline-color:#ffffff; --darkreader-inline-bgcolor:#06419c; margin-top: 1.5rem !important;">Try it online!</a>
+</p>
+
 ## The syntax
 
 The syntax is really simple:
@@ -45,24 +49,27 @@ It also supports a URL format, which is essentially the same thing, except that 
 
 The `JsonPointer` struct is the model for JSON Pointer.
 
-The easiest way to create one is to parse it with either `Parse()` or `TryParse()`.  This will give you an instance of the model that can be used to evaluate instances.
+There are three ways create pointers:
 
-Evaluating the above example might look something like this:
+- parsing with either `Parse()` or `TryParse()`
+  ```c#
+  var pointer = JsonPointer.Parse("/objects/and/3/arrays");
+  ```
+- building with `Create()` and supplying the segments explicitly
+  ```c#
+  var pointer = JsonPointer.Create("object", "and", 3, "arrays");
+  ```
+- building with `Create<T>()` and supplying a LINQ expression
+  ```c#
+  var pointer = JsonPointer.Create<MyObject>(x => x.objects.and[3].arrays);
+  ```
+
+All of these options will give you an instance of the model that can be used to evaluate instances. 
 
 ```c#
 var element = JsonDocument.Parse("{\"objects\":{\"and\":[\"item zero\",null,2,{\"arrays\":\"found me\"}]}}");
-var pointer = JsonPointer.Parse("/objects/and/3/arrays");
-
-var result = pointer.Evaluate(element); // contains a JsonElement with a "found me" value.
+var result = pointer.Evaluate(element); // contains a JsonElement with a "found me" value
 ```
-
-You can also create pointers from objects using lambda expressions:
-
-```C#
-var pointer = JsonPointer.Create(x => x.objects.and[3].arrays);
-```
-
-This yields the same pointe as the example above.
 
 ## Relative JSON Pointers
 
@@ -70,4 +77,4 @@ This yields the same pointe as the example above.
 
 Relative JSON Pointers are implemented with the `RelativeJsonPointer` struct.  Interactions with this struct are very similar to `JsonPointer`.
 
-Unfortunately, since evaluation of these pointers require parent navigation, a feature which is [currently unsupported by `System.Text.Json`](https://github.com/dotnet/runtime/issues/40452), only the model is functional at this time.
+Unfortunately, since evaluation of these pointers require parent navigation, a feature which is [currently unsupported by `System.Text.Json`](https://github.com/dotnet/runtime/issues/40452), only the model is available at this time; evaluation is non-functional.

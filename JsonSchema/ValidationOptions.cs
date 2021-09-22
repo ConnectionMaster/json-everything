@@ -11,6 +11,7 @@ namespace Json.Schema
 	public class ValidationOptions
 	{
 		private Uri? _defaultBaseUri;
+		private ILog? _log;
 
 		/// <summary>
 		/// The default settings.
@@ -31,11 +32,13 @@ namespace Json.Schema
 		/// Specifies the output format.
 		/// </summary>
 		public OutputFormat OutputFormat { get; set; }
+
 		/// <summary>
 		/// The local schema registry.  If a schema is not found here, it will
 		/// automatically check the global registry as well.
 		/// </summary>
-		public SchemaRegistry SchemaRegistry { get; } = new SchemaRegistry();
+		public SchemaRegistry SchemaRegistry { get; }
+
 		/// <summary>
 		/// The local vocabulary registry.  If a schema is not found here, it will
 		/// automatically check the global registry as well.
@@ -49,6 +52,21 @@ namespace Json.Schema
 			get => _defaultBaseUri ??= new Uri("https://json-everything/base");
 			set => _defaultBaseUri = value;
 		}
+
+		/// <summary>
+		/// Gets or sets the indent level for the log.
+		/// </summary>
+		public int LogIndentLevel { get; set; }
+
+		/// <summary>
+		/// Gets or sets a log which will output processing information.
+		/// </summary>
+		public ILog Log
+		{
+			get => _log ?? NullLog.Instance;
+			set => _log = value;
+		}
+
 
 		/// <summary>
 		/// Obsolete.  Use <see cref="RequireFormatValidation"/> instead with the same semantics.
@@ -74,12 +92,25 @@ namespace Json.Schema
 		
 		internal Draft ValidatingAs { get; private set; }
 
+		/// <summary>
+		/// Create a new instance of the <see cref="ValidationOptions"/> class.
+		/// </summary>
+		public ValidationOptions()
+		{
+			SchemaRegistry = new SchemaRegistry(this);
+		}
+
 		internal static ValidationOptions From(ValidationOptions other)
 		{
 			var options = new ValidationOptions
 			{
 				ValidateAs = other.ValidateAs,
-				OutputFormat = other.OutputFormat
+				OutputFormat = other.OutputFormat,
+				DefaultBaseUri = other.DefaultBaseUri,
+				ValidateMetaSchema = other.ValidateMetaSchema,
+				RequireFormatValidation = other.RequireFormatValidation,
+				LogIndentLevel = other.LogIndentLevel,
+				Log = other._log ?? Default.Log
 			};
 			options.SchemaRegistry.CopyFrom(other.SchemaRegistry);
 			options.VocabularyRegistry.CopyFrom(other.VocabularyRegistry);

@@ -110,6 +110,8 @@ namespace Json.Path.Tests.Suite
 				Assert.Fail($"Could not parse path: {testCase.PathString}");
 			}
 
+			Console.WriteLine($"Actual (values): {JsonSerializer.Serialize(actual.Matches.Select(x => x.Value))}");
+			Console.WriteLine();
 			Console.WriteLine($"Actual: {JsonSerializer.Serialize(actual)}");
 			if (testCase.Consensus == null)
 				Assert.Inconclusive("Test case has no consensus result.  Cannot validate.");
@@ -125,7 +127,7 @@ namespace Json.Path.Tests.Suite
 		{
 			var o = JsonDocument.Parse(jsonString).RootElement;
 			var selector = pathString;
-			if (!Json.Path.JsonPath.TryParse(selector, out var path))
+			if (!JsonPath.TryParse(selector, out var path))
 				return null;
 			var results = path.Evaluate(o);
 

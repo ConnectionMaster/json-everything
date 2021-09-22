@@ -2,7 +2,7 @@
 using System.Text.Json;
 using NUnit.Framework;
 
-namespace JsonPointer.Tests
+namespace Json.Pointer.Tests
 {
 	[TestFixture]
 	public class JsonPointerTests
@@ -27,7 +27,7 @@ namespace JsonPointer.Tests
 		{
 			using var target = JsonDocument.Parse("{\"a\":\"1\",\"b\":[5, true, null],\"c\":{\"false\":false}}");
 
-			var pointer = Json.Pointer.JsonPointer.Parse(pointerString);
+			var pointer = JsonPointer.Parse(pointerString);
 
 			var actual = pointer.Evaluate(target.RootElement);
 
@@ -39,7 +39,7 @@ namespace JsonPointer.Tests
 		{
 			using var target = JsonDocument.Parse("{\"a\":\"1\",\"b\":[5, true, null],\"c\":{\"0\":false}}");
 
-			var pointer = Json.Pointer.JsonPointer.Parse("/c/0");
+			var pointer = JsonPointer.Parse("/c/0");
 
 			var actual = pointer.Evaluate(target.RootElement);
 
@@ -52,12 +52,20 @@ namespace JsonPointer.Tests
 		{
 			using var target = JsonDocument.Parse("{\"a\":\"1\",\"b\":[5, true, null],\"c\":{\"0\":false}}");
 
-			var pointer = Json.Pointer.JsonPointer.Parse("/b/-");
+			var pointer = JsonPointer.Parse("/b/-");
 
 			var actual = pointer.Evaluate(target.RootElement);
 
 			// ReSharper disable once PossibleInvalidOperationException
 			Assert.AreEqual(JsonValueKind.Null, actual.Value.ValueKind);
+		}
+
+		[Test]
+		public void ImplicitCastTest()
+		{
+			var pointer = JsonPointer.Create("string", 1, "foo");
+
+			Assert.AreEqual("/string/1/foo", pointer.ToString());
 		}
 	}
 }

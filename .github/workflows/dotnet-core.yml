@@ -10,6 +10,7 @@ on:
     paths:
       - 'Json*/**/*'
       - 'ref-repos/**/*'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -96,35 +97,43 @@ jobs:
         color: ${{ env.BUILD_STATUS }}
 
   analyze-more:
+    if: github.event_name == 'pull_request'
     needs: build
     name: Analyze Json.More.Net 
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Setup .NET Core
+      - uses: marceloprado/has-changed-path@v1
+        id: changed-more
+        with:
+          paths: Json.More/**
+      - if: steps.changed-more.outputs.changed == 'true'
+        uses: actions/checkout@v2
+      - if: steps.changed-more.outputs.changed == 'true'
+        name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
           dotnet-version: 3.1.301
 
-      - name: Download Artifacts
+      - if: steps.changed-more.outputs.changed == 'true'
+        name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
           path: artifacts
 
         # Set up
-      - name: Create local manifest file
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-more.outputs.changed == 'true'
+        name: Create local manifest file
         run: dotnet new tool-manifest
-      - name: Install analyzer
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-more.outputs.changed == 'true'
+        name: Install analyzer
         run: dotnet tool install SemVerAnalyzer
 
-      - name: Analyze more
+      - if: steps.changed-more.outputs.changed == 'true'
+        name: Analyze more
         id: analyze-more
-        if: github.event_name == 'pull_request'
         # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
         run: |
-          dotnet analyze-semver -a artifacts/DLLs/Json.More/bin/Release/netstandard2.0/Json.More.dll -o semver-report-more.md -c .github/semver_config.json -p Json.More.Net --include-header true --omit-disclaimer true --assume-changes true
+          dotnet analyze-semver -a artifacts/DLLs/Json.More/bin/Release/netstandard2.0/Json.More.dll -o semver-report-more.md -c .github/semver_config.json -p Json.More.Net
           unset HAS_REPORT
           unset REPORT
           if [ -s semver-report-more.md ]
@@ -148,35 +157,43 @@ jobs:
             ${{ steps.analyze-more.outputs.REPORT }}
 
   analyze-patch:
+    if: github.event_name == 'pull_request'
     needs: build
     name: Analyze JsonPatch.Net
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Setup .NET Core
+      - uses: marceloprado/has-changed-path@v1
+        id: changed-patch
+        with:
+          paths: JsonPatch/**
+      - if: steps.changed-patch.outputs.changed == 'true'
+        uses: actions/checkout@v2
+      - if: steps.changed-patch.outputs.changed == 'true'
+        name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
           dotnet-version: 3.1.301
 
-      - name: Download Artifacts
+      - if: steps.changed-patch.outputs.changed == 'true'
+        name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
           path: artifacts
 
         # Set up
-      - name: Create local manifest file
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-patch.outputs.changed == 'true'
+        name: Create local manifest file
         run: dotnet new tool-manifest
-      - name: Install analyzer
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-patch.outputs.changed == 'true'
+        name: Install analyzer
         run: dotnet tool install SemVerAnalyzer
 
-      - name: Analyze patch
+      - if: steps.changed-patch.outputs.changed == 'true'
+        name: Analyze patch
         id: analyze-patch
-        if: github.event_name == 'pull_request'
         # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
         run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonPatch/bin/Release/netstandard2.0/JsonPatch.dll -o semver-report-patch.md -c .github/semver_config.json -p JsonPatch.Net --include-header true --omit-disclaimer true --assume-changes true
+          dotnet analyze-semver -a artifacts/DLLs/JsonPatch/bin/Release/netstandard2.0/JsonPatch.dll -o semver-report-patch.md -c .github/semver_config.json -p JsonPatch.Net
           unset HAS_REPORT
           unset REPORT
           if [ -s semver-report-patch.md ]
@@ -200,35 +217,43 @@ jobs:
             ${{ steps.analyze-patch.outputs.REPORT }}
 
   analyze-path:
+    if: github.event_name == 'pull_request'
     needs: build
     name: Analyze JsonPath.Net
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Setup .NET Core
+      - uses: marceloprado/has-changed-path@v1
+        id: changed-path
+        with:
+          paths: JsonPath/**
+      - if: steps.changed-path.outputs.changed == 'true'
+        uses: actions/checkout@v2
+      - if: steps.changed-path.outputs.changed == 'true'
+        name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
           dotnet-version: 3.1.301
 
-      - name: Download Artifacts
+      - if: steps.changed-path.outputs.changed == 'true'
+        name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
           path: artifacts
 
         # Set up
-      - name: Create local manifest file
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-path.outputs.changed == 'true'
+        name: Create local manifest file
         run: dotnet new tool-manifest
-      - name: Install analyzer
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-path.outputs.changed == 'true'
+        name: Install analyzer
         run: dotnet tool install SemVerAnalyzer
 
-      - name: Analyze path
+      - if: steps.changed-path.outputs.changed == 'true'
+        name: Analyze path
         id: analyze-path
-        if: github.event_name == 'pull_request'
         # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
         run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonPath/bin/Release/netstandard2.1/JsonPath.Net.dll -o semver-report-path.md -c .github/semver_config.json --include-Header --include-header true --omit-disclaimer true --assume-changes true
+          dotnet analyze-semver -a artifacts/DLLs/JsonPath/bin/Release/netstandard2.1/JsonPath.Net.dll -o semver-report-path.md -c .github/semver_config.json --include-Header
           unset HAS_REPORT
           unset REPORT
           if [ -s semver-report-path.md ]
@@ -252,35 +277,43 @@ jobs:
             ${{ steps.analyze-path.outputs.REPORT }}
 
   analyze-pointer:
+    if: github.event_name == 'pull_request'
     needs: build
     name: Analyze JsonPointer.Net
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Setup .NET Core
+      - uses: marceloprado/has-changed-path@v1
+        id: changed-pointer
+        with:
+          paths: JsonPointer/**
+      - if: steps.changed-pointer.outputs.changed == 'true'
+        uses: actions/checkout@v2
+      - if: steps.changed-pointer.outputs.changed == 'true'
+        name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
           dotnet-version: 3.1.301
 
-      - name: Download Artifacts
+      - if: steps.changed-pointer.outputs.changed == 'true'
+        name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
           path: artifacts
 
         # Set up
-      - name: Create local manifest file
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-pointer.outputs.changed == 'true'
+        name: Create local manifest file
         run: dotnet new tool-manifest
-      - name: Install analyzer
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-pointer.outputs.changed == 'true'
+        name: Install analyzer
         run: dotnet tool install SemVerAnalyzer
 
-      - name: Analyze pointer
+      - if: steps.changed-pointer.outputs.changed == 'true'
+        name: Analyze pointer
         id: analyze-poitner
-        if: github.event_name == 'pull_request'
         # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
         run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonPointer/bin/Release/netstandard2.0/JsonPointer.Net.dll -o semver-report-pointer.md -c .github/semver_config.json --include-header true --omit-disclaimer true --assume-changes true
+          dotnet analyze-semver -a artifacts/DLLs/JsonPointer/bin/Release/netstandard2.0/JsonPointer.Net.dll -o semver-report-pointer.md -c .github/semver_config.json
           unset HAS_REPORT
           unset REPORT
           if [ -s semver-report-pointer.md ]
@@ -304,35 +337,43 @@ jobs:
             ${{ steps.analyze-pointer.outputs.REPORT }}
 
   analyze-schema:
+    if: github.event_name == 'pull_request'
     needs: build
     name: Analyze JsonSchema.Net
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Setup .NET Core
+      - uses: marceloprado/has-changed-path@v1
+        id: changed-schema
+        with:
+          paths: JsonSchema/**
+      - if: steps.changed-schema.outputs.changed == 'true'
+        uses: actions/checkout@v2
+      - if: steps.changed-schema.outputs.changed == 'true'
+        name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
           dotnet-version: 3.1.301
 
-      - name: Download Artifacts
+      - if: steps.changed-schema.outputs.changed == 'true'
+        name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
           path: artifacts
 
         # Set up
-      - name: Create local manifest file
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-schema.outputs.changed == 'true'
+        name: Create local manifest file
         run: dotnet new tool-manifest
-      - name: Install analyzer
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-schema.outputs.changed == 'true'
+        name: Install analyzer
         run: dotnet tool install SemVerAnalyzer
 
-      - name: Analyze schema
+      - if: steps.changed-schema.outputs.changed == 'true'
+        name: Analyze schema
         id: analyze-schema
-        if: github.event_name == 'pull_request'
         # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
         run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonSchema/bin/Release/netstandard2.0/JsonSchema.Net.dll -o semver-report-schema.md -c .github/semver_config.json --include-header true --omit-disclaimer true --assume-changes true
+          dotnet analyze-semver -a artifacts/DLLs/JsonSchema/bin/Release/netstandard2.0/JsonSchema.Net.dll -o semver-report-schema.md -c .github/semver_config.json
           unset HAS_REPORT
           unset REPORT
           if [ -s semver-report-schema.md ]
@@ -356,39 +397,48 @@ jobs:
             ${{ steps.analyze-schema.outputs.REPORT }}
 
   analyze-schema-gen:
+    if: github.event_name == 'pull_request'
     needs: build
     name: Analyze JsonSchema.Net.Generation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Setup .NET Core
+      - uses: marceloprado/has-changed-path@v1
+        id: changed-schema-gen
+        with:
+          paths: JsonSchema.Generation/**
+      - if: steps.changed-schema-gen.outputs.changed == 'true'
+        uses: actions/checkout@v2
+      - if: steps.changed-schema-gen.outputs.changed == 'true'
+        name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
           dotnet-version: 3.1.301
-      - name: Setup .NET Core
+      - if: steps.changed-schema-gen.outputs.changed == 'true'
+        name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
           dotnet-version: 5.0.100
 
-      - name: Download Artifacts
+      - if: steps.changed-schema-gen.outputs.changed == 'true'
+        name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
           path: artifacts
 
         # Set up
-      - name: Create local manifest file
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-schema-gen.outputs.changed == 'true'
+        name: Create local manifest file
         run: dotnet new tool-manifest
-      - name: Install analyzer
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-schema-gen.outputs.changed == 'true'
+        name: Install analyzer
         run: dotnet tool install SemVerAnalyzer
 
-      - name: Analyze schema generation
+      - if: steps.changed-schema-gen.outputs.changed == 'true'
+        name: Analyze schema generation
         id: analyze-schema-generation
-        if: github.event_name == 'pull_request'
         # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
         run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonSchema.Generation/bin/Release/netstandard2.0/JsonSchema.Net.Generation.dll -o semver-report-schema-gen.md -c .github/semver_config.json --include-header true --omit-disclaimer true --assume-changes true
+          dotnet analyze-semver -a artifacts/DLLs/JsonSchema.Generation/bin/Release/net5.0/JsonSchema.Net.Generation.dll -o semver-report-schema-gen.md -c .github/semver_config.json
           unset HAS_REPORT
           unset REPORT
           if [ -s semver-report-schema-gen.md ]
@@ -412,35 +462,43 @@ jobs:
             ${{ steps.analyze-schema-generation.outputs.REPORT }}
 
   analyze-schema-data:
+    if: github.event_name == 'pull_request'
     needs: build
     name: Analyze JsonSchema.Net.Data
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Setup .NET Core
+      - uses: marceloprado/has-changed-path@v1
+        id: changed-schema-data
+        with:
+          paths: JsonSchema.Data/**
+      - if: steps.changed-schema-data.outputs.changed == 'true'
+        uses: actions/checkout@v2
+      - if: steps.changed-schema-data.outputs.changed == 'true'
+        name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
           dotnet-version: 3.1.301
 
-      - name: Download Artifacts
+      - if: steps.changed-schema-data.outputs.changed == 'true'
+        name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
           path: artifacts
 
         # Set up
-      - name: Create local manifest file
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-schema-data.outputs.changed == 'true'
+        name: Create local manifest file
         run: dotnet new tool-manifest
-      - name: Install analyzer
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-schema-data.outputs.changed == 'true'
+        name: Install analyzer
         run: dotnet tool install SemVerAnalyzer
 
-      - name: Analyze schema data
+      - if: steps.changed-schema-data.outputs.changed == 'true'
+        name: Analyze schema data
         id: analyze-schema-data
-        if: github.event_name == 'pull_request'
         # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
         run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonSchema.Data/bin/Release/netstandard2.0/JsonSchema.Net.Data.dll -o semver-report-schema-data.md -c .github/semver_config.json --include-header true --omit-disclaimer true --assume-changes true
+          dotnet analyze-semver -a artifacts/DLLs/JsonSchema.Data/bin/Release/netstandard2.0/JsonSchema.Net.Data.dll -o semver-report-schema-data.md -c .github/semver_config.json
           unset HAS_REPORT
           unset REPORT
           if [ -s semver-report-schema-data.md ]
@@ -463,36 +521,104 @@ jobs:
           msg: |
             ${{ steps.analyze-schema-data.outputs.REPORT }}
 
-  analyze-logic:
+  analyze-schema-unique-keys:
+    if: github.event_name == 'pull_request'
     needs: build
-    name: Analyze JsonLogic
+    name: Analyze JsonSchema.Net.UniqueKeys
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Setup .NET Core
+      - uses: marceloprado/has-changed-path@v1
+        id: changed-schema-uniquekeys
+        with:
+          paths: JsonSchema.UniqueKeys/**
+      - if: steps.changed-schema-uniquekeys.outputs.changed == 'true'
+        uses: actions/checkout@v2
+      - if: steps.changed-schema-uniquekeys.outputs.changed == 'true'
+        name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
           dotnet-version: 3.1.301
 
-      - name: Download Artifacts
+      - if: steps.changed-schema-uniquekeys.outputs.changed == 'true'
+        name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
           path: artifacts
 
         # Set up
-      - name: Create local manifest file
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-schema-uniquekeys.outputs.changed == 'true'
+        name: Create local manifest file
         run: dotnet new tool-manifest
-      - name: Install analyzer
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-schema-uniquekeys.outputs.changed == 'true'
+        name: Install analyzer
         run: dotnet tool install SemVerAnalyzer
 
-      - name: Analyze logic
-        id: analyze-logic
-        if: github.event_name == 'pull_request'
+      - if: steps.changed-schema-uniquekeys.outputs.changed == 'true'
+        name: Analyze schema unique keys
+        id: analyze-schema-unique-keys
         # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
         run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonLogic/bin/Release/netstandard2.1/JsonLogic.dll -o semver-report-logic.md -c .github/semver_config.json --include-header true --omit-disclaimer true --assume-changes true
+          dotnet analyze-semver -a artifacts/DLLs/JsonSchema.UniqueKeys/bin/Release/netstandard2.0/JsonSchema.Net.UniqueKeys.dll -o semver-report-schema-unique-keys.md -c .github/semver_config.json
+          unset HAS_REPORT
+          unset REPORT
+          if [ -s semver-report-schema-unique-keys.md ]
+          then
+            HAS_REPORT='true'
+            REPORT=$(<semver-report-schema-unique-keys.md)
+            REPORT="${REPORT//'%'/'%25'}"
+            REPORT="${REPORT//$'\n'/'%0A'}"
+            REPORT="${REPORT//$'\r'/'%0D'}"
+            echo "::set-output name=REPORT::${REPORT}"
+          fi
+          echo ::set-output name=HAS_REPORT::${HAS_REPORT}
+
+        # Report
+      - if: steps.analyze-schema-unique-keys.outputs.HAS_REPORT
+        uses: unsplash/comment-on-pr@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          msg: |
+            ${{ steps.analyze-schema-unique-keys.outputs.REPORT }}
+
+  analyze-logic:
+    if: github.event_name == 'pull_request'
+    needs: build
+    name: Analyze JsonLogic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: marceloprado/has-changed-path@v1
+        id: changed-logic
+        with:
+          paths: JsonLogic/**
+      - if: steps.changed-logic.outputs.changed == 'true'
+        uses: actions/checkout@v2
+      - if: steps.changed-logic.outputs.changed == 'true'
+        name: Setup .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 3.1.301
+
+      - if: steps.changed-logic.outputs.changed == 'true'
+        name: Download Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          path: artifacts
+
+        # Set up
+      - if: steps.changed-logic.outputs.changed == 'true'
+        name: Create local manifest file
+        run: dotnet new tool-manifest
+      - if: steps.changed-logic.outputs.changed == 'true'
+        name: Install analyzer
+        run: dotnet tool install SemVerAnalyzer
+
+      - if: steps.changed-logic.outputs.changed == 'true'
+        name: Analyze logic
+        id: analyze-logic
+        # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
+        run: |
+          dotnet analyze-semver -a artifacts/DLLs/JsonLogic/bin/Release/netstandard2.1/JsonLogic.dll -o semver-report-logic.md -c .github/semver_config.json
           unset HAS_REPORT
           unset REPORT
           if [ -s semver-report-logic.md ]

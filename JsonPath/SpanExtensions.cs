@@ -43,50 +43,61 @@ namespace Json.Path
 		// expects the full expression, including the ()
 		public static bool TryParseExpression(this ReadOnlySpan<char> span, ref int i, [NotNullWhen(true)] out QueryExpressionNode? expression)
 		{
-			var index = i;
-			if (span[index] != '(')
+			if (span[i] != '(')
 			{
 				expression = null;
 				return false;
 			}
 
-			index++;
-			if (!QueryExpressionNode.TryParseSingleValue(span, ref index, out var left))
+			i++;
+			span.ConsumeWhitespace(ref i);
+			if (!QueryExpressionNode.TryParseSingleValue(span, ref i, out var left))
 			{
 				expression = null;
 				return false;
 			}
 
 			var followingNodes = new List<(IQueryExpressionOperator, QueryExpressionNode)>();
-			while (index < span.Length && span[index] != ')')
+			while (i < span.Length && span[i] != ')')
 			{
-				if (!Operators.TryParse(span, ref index, out var op))
+				span.ConsumeWhitespace(ref i);
+				if (!Operators.TryParse(span, ref i, out var op))
 				{
 					expression = null;
 					return false;
 				}
 
 				QueryExpressionNode? right;
-				if (span[index] == '(')
+				span.ConsumeWhitespace(ref i);
+				if (span[i] == '(')
 				{
-					if (!span.TryParseExpression(ref index, out right))
+					span.ConsumeWhitespace(ref i);
+					if (!span.TryParseExpression(ref i, out right))
 					{
 						expression = null;
 						return false;
 					}
 				}
-				else if (!QueryExpressionNode.TryParseSingleValue(span, ref index, out right))
+				else
 				{
-					expression = null;
-					return false;
+					span.ConsumeWhitespace(ref i);
+					if (!QueryExpressionNode.TryParseSingleValue(span, ref i, out right))
+					{
+						expression = null;
+						return false;
+					}
 				}
-				followingNodes.Add((op!, right!));
+
+				followingNodes.Add((op, right));
 			}
+
+			i++; // consume ')'
 
 			if (!followingNodes.Any())
 			{
-				i = index;
-				expression = new QueryExpressionNode(left, Operators.Exists, null);
+				expression = left.Operator is NotOperator
+					? left
+					: new QueryExpressionNode(left, Operators.Exists, null!);
 				return true;
 			}
 
@@ -101,7 +112,7 @@ namespace Json.Path
 					continue;
 				}
 
-				while (current.Any() && current.Peek().Operator.OrderOfOperation < op.OrderOfOperation)
+				while (current.Any() && current.Peek().Operator?.OrderOfOperation < op.OrderOfOperation)
 				{
 					current.Pop();
 				}
@@ -116,9 +127,8 @@ namespace Json.Path
 				current.Push(root);
 			}
 
-			i = index;
 			expression = root;
-			return true;
+			return expression != null;
 		}
 
 		public static bool TryParseJsonElement(this ReadOnlySpan<char> span, ref int i, out JsonElement element)
@@ -142,7 +152,7 @@ namespace Json.Path
 					case '7': case '8': case '9':
 						end = i;
 						var allowDash = false;
-						while (end < span.Length && (span[end].In('0'..'9') ||
+						while (end < span.Length && (span[end].In('0'..('9' + 1)) ||
 						                             span[end].In('e', '.', '-')))
 						{
 							if (!allowDash && span[end] == '-') break;
@@ -199,7 +209,8 @@ namespace Json.Path
 				var block = span[i..end];
 				if (block[0] == '\'' && block[^1] == '\'')
 					block = $"\"{block[1..^1].ToString()}\"".AsSpan();
-				element = JsonDocument.Parse(block.ToString()).RootElement.Clone();
+				using var doc = JsonDocument.Parse(block.ToString());
+				element = doc.RootElement.Clone();
 				i = end;
 				return true;
 			}

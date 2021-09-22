@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -40,23 +41,32 @@ namespace Json.Schema
 		/// <param name="context">Contextual details for the validation process.</param>
 		public void Validate(ValidationContext context)
 		{
-			var newUri = UpdateUri(context.CurrentUri);
-			context.ParentContext.UriChanged = context.ParentContext.CurrentUri != newUri;
-			if (context.ParentContext.UriChanged)
+			context.EnterKeyword(Name);
+			if (context.LocalSchema.Keywords!.OfType<RefKeyword>().Any() &&
+			    context.Options.ValidatingAs == Draft.Draft6 || context.Options.ValidatingAs == Draft.Draft7)
 			{
-				context.ParentContext.CurrentAnchor = null;
-				context.ParentContext.DynamicAnchors.Clear();
+				context.NotApplicable(() => "$ref present; ignoring");
+				context.IsValid = true;
+				return;
 			}
+			var newUri = context.NavigatedByDirectRef ? context.CurrentUri : UpdateUri(context.CurrentUri);
+			context.ParentContext.UriChanged |= context.ParentContext.CurrentUri != newUri;
+			if (context.ParentContext.UriChanged) 
+				context.ParentContext.CurrentAnchor = null;
+			context.Options.SchemaRegistry.EnteringUriScope(newUri!);
+			context.IsNewDynamicScope = true;
 			context.ParentContext.CurrentUri = newUri;
 			context.IsValid = true;
+			context.ExitKeyword(Name, context.IsValid);
 		}
 
 		internal Uri UpdateUri(Uri? currentUri)
 		{
 			if (currentUri == null || Id.IsAbsoluteUri) return Id;
 
+			var idHasBase = Id.OriginalString.IndexOf('#') != 0;
 			var baseUri = currentUri;
-			if (currentUri.Segments.Length > 1 && currentUri.OriginalString.EndsWith("/")) 
+			if (idHasBase && currentUri.Segments.Length > 1 && currentUri.IsFile)
 				baseUri = baseUri.GetParentUri();
 
 			return new Uri(baseUri, Id);

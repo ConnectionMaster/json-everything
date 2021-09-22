@@ -40,6 +40,7 @@ namespace Json.Schema
 		/// <param name="context">Contextual details for the validation process.</param>
 		public void Validate(ValidationContext context)
 		{
+			context.EnterKeyword(Name);
 			var parts = Reference.OriginalString.Split(new[] {'#'}, StringSplitOptions.None);
 			var baseUri = parts[0];
 			var fragment = parts.Length > 1 ? parts[1] : null;
@@ -65,7 +66,19 @@ namespace Json.Schema
 				baseSchema = context.Options.SchemaRegistry.Get(newUri) ?? context.SchemaRoot;
 			}
 
+			var absoluteReference = SchemaRegistry.GetFullReference(newUri, fragment);
+			if (context.NavigatedReferences.Contains(absoluteReference))
+			{
+				context.IsValid = false;
+				context.Message = "Encountered recursive reference";
+				context.ExitKeyword(Name, context.IsValid);
+				return;
+			}
+
+			context.NavigatedReferences.Add(absoluteReference);
+
 			JsonSchema? schema;
+			var navigatedByDirectRef = true;
 			if (!string.IsNullOrEmpty(fragment) && AnchorKeyword.AnchorPattern.IsMatch(fragment!))
 				schema = context.Options.SchemaRegistry.Get(newUri, fragment);
 			else
@@ -73,7 +86,8 @@ namespace Json.Schema
 				if (baseSchema == null)
 				{
 					context.IsValid = false;
-					context.Message = $"Could not resolve base URI `{baseUri}`";
+					context.Message = $"Could not resolve base URI `{newUri}`";
+					context.ExitKeyword(Name, context.IsValid);
 					return;
 				}
 
@@ -84,10 +98,12 @@ namespace Json.Schema
 					{
 						context.IsValid = false;
 						context.Message = $"Could not parse pointer `{fragment}`";
+						context.ExitKeyword(Name, context.IsValid);
 						return;
 					}
 
 					(schema, newUri) = baseSchema.FindSubschema(pointer, newUri);
+					navigatedByDirectRef = false;
 				}
 				else
 					schema = baseSchema;
@@ -97,10 +113,12 @@ namespace Json.Schema
 			{
 				context.IsValid = false;
 				context.Message = $"Could not resolve reference `{Reference}`";
+				context.ExitKeyword(Name, context.IsValid);
 				return;
 			}
 
 			var subContext = ValidationContext.From(context, newUri: newUri);
+			subContext.NavigatedByDirectRef = navigatedByDirectRef;
 			if (!string.IsNullOrEmpty(fragment) && JsonPointer.TryParse(fragment!, out var reference))
 				subContext.Reference = reference;
 			if (!ReferenceEquals(baseSchema, context.SchemaRoot))
@@ -109,6 +127,7 @@ namespace Json.Schema
 			context.NestedContexts.Add(subContext);
 			context.ConsolidateAnnotations();
 			context.IsValid = subContext.IsValid;
+			context.ExitKeyword(Name, context.IsValid);
 		}
 
 		/// <summary>Indicates whether the current object is equal to another object of the same type.</summary>

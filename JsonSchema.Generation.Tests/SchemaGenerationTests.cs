@@ -1,11 +1,8 @@
+using NUnit.Framework;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json;
 using System.Text.Json.Serialization;
-using Json.More;
-using Json.Schema.Generation.Generators;
-using NUnit.Framework;
+using static Json.Schema.Generation.Tests.AssertionExtensions;
 
 namespace Json.Schema.Generation.Tests
 {
@@ -27,6 +24,17 @@ namespace Json.Schema.Generation.Tests
 				yield return new TestCaseData(typeof(float), SchemaValueType.Number);
 				yield return new TestCaseData(typeof(double), SchemaValueType.Number);
 				yield return new TestCaseData(typeof(decimal), SchemaValueType.Number);
+				yield return new TestCaseData(typeof(bool?), SchemaValueType.Boolean);
+				yield return new TestCaseData(typeof(byte?), SchemaValueType.Integer);
+				yield return new TestCaseData(typeof(short?), SchemaValueType.Integer);
+				yield return new TestCaseData(typeof(ushort?), SchemaValueType.Integer);
+				yield return new TestCaseData(typeof(int?), SchemaValueType.Integer);
+				yield return new TestCaseData(typeof(uint?), SchemaValueType.Integer);
+				yield return new TestCaseData(typeof(long?), SchemaValueType.Integer);
+				yield return new TestCaseData(typeof(ulong?), SchemaValueType.Integer);
+				yield return new TestCaseData(typeof(float?), SchemaValueType.Number);
+				yield return new TestCaseData(typeof(double?), SchemaValueType.Number);
+				yield return new TestCaseData(typeof(decimal?), SchemaValueType.Number);
 			}
 		}
 
@@ -37,7 +45,7 @@ namespace Json.Schema.Generation.Tests
 
 			JsonSchema actual = new JsonSchemaBuilder().FromType(dotnetType);
 
-			Assert.AreEqual(expected, actual);
+			AssertEqual(expected, actual);
 		}
 
 		[Test]
@@ -48,19 +56,18 @@ namespace Json.Schema.Generation.Tests
 
 			JsonSchema actual = new JsonSchemaBuilder().FromType<int[]>();
 
-			Assert.AreEqual(expected, actual);
+			AssertEqual(expected, actual);
 		}
 
 		[Test]
-		public void ListOfStrings()
+		public void NullableIntArray()
 		{
-			JsonSchema expected = new JsonSchemaBuilder()
-				.Type(SchemaValueType.Array)
-				.Items(new JsonSchemaBuilder().Type(SchemaValueType.String));
+			JsonSchema expected = new JsonSchemaBuilder().Type(SchemaValueType.Array)
+				.Items(new JsonSchemaBuilder().Type(SchemaValueType.Integer));
 
-			JsonSchema actual = new JsonSchemaBuilder().FromType<List<string>>();
+			JsonSchema actual = new JsonSchemaBuilder().FromType<int?[]>();
 
-			Assert.AreEqual(expected, actual);
+			AssertEqual(expected, actual);
 		}
 
 		[Test]
@@ -76,7 +83,7 @@ namespace Json.Schema.Generation.Tests
 
 			JsonSchema actual = new JsonSchemaBuilder().FromType<IEnumerable<List<string>>>();
 
-			Assert.AreEqual(expected, actual);
+			AssertEqual(expected, actual);
 		}
 
 		[Test]
@@ -86,7 +93,7 @@ namespace Json.Schema.Generation.Tests
 
 			JsonSchema actual = new JsonSchemaBuilder().FromType<Array>();
 
-			Assert.AreEqual(expected, actual);
+			AssertEqual(expected, actual);
 		}
 
 		[Test]
@@ -98,30 +105,18 @@ namespace Json.Schema.Generation.Tests
 
 			JsonSchema actual = new JsonSchemaBuilder().FromType<Dictionary<string, int>>();
 
-			Assert.AreEqual(expected, actual);
+			AssertEqual(expected, actual);
 		}
 
 		[Test]
-		public void EnumDictionaryOfInt()
+		public void EmptyObject()
 		{
 			JsonSchema expected = new JsonSchemaBuilder()
-				.Type(SchemaValueType.Object)
-				.AdditionalProperties(new JsonSchemaBuilder().Type(SchemaValueType.Integer));
+				.Type(SchemaValueType.Object);
 
-			JsonSchema actual = new JsonSchemaBuilder().FromType<Dictionary<DayOfWeek, int>>();
+			JsonSchema actual = new JsonSchemaBuilder().FromType<object>();
 
-			Assert.AreEqual(expected, actual);
-		}
-
-		[Test]
-		public void Enum()
-		{
-			JsonSchema expected = new JsonSchemaBuilder()
-				.Enum(System.Enum.GetNames(typeof(DayOfWeek)).Select(v => v.AsJsonElement()));
-
-			JsonSchema actual = new JsonSchemaBuilder().FromType<DayOfWeek>();
-
-			Assert.AreEqual(expected, actual);
+			AssertEqual(expected, actual);
 		}
 
 		// ReSharper disable once ClassNeverInstantiated.Local
@@ -146,6 +141,13 @@ namespace Json.Schema.Generation.Tests
 			[Pattern("^[a-z0-9_]$")]
 			public string String { get; set; }
 
+			[Required]
+			public string RequiredString { get; set; }
+
+			[JsonPropertyName("rename-this-required-string")]
+			[Required]
+			public string RenameThisRequiredString { get; set; }
+
 			[MinItems(5)]
 			[MaxItems(10)]
 			public List<bool> ListOfBool { get; set; }
@@ -165,10 +167,18 @@ namespace Json.Schema.Generation.Tests
 
 			[JsonIgnore]
 			public int IgnoreThis { get; set; }
+
 			[JsonPropertyName("rename-this")]
 			public string RenameThis { get; set; }
 
 			public float StrictNumber { get; set; }
+			public float OtherStrictNumber { get; set; }
+
+			[ReadOnly]
+			public float ReadOnlyNumber { get; set; }
+
+			[WriteOnly]
+			public float WriteOnlyNumber { get; set; }
 
 			[JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
 			public float StringyNumber { get; set; }
@@ -178,6 +188,10 @@ namespace Json.Schema.Generation.Tests
 
 			[JsonNumberHandling(JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.AllowNamedFloatingPointLiterals)]
 			public float StringyNotANumber { get; set; }
+
+			[Title("title")]
+			[Description("description")]
+			public string Metadata { get; set; }
 		}
 
 		[Test]
@@ -199,6 +213,12 @@ namespace Json.Schema.Generation.Tests
 						.Type(SchemaValueType.String)
 						.MaxLength(10)
 						.Pattern("^[a-z0-9_]$")
+					),
+					("RequiredString", new JsonSchemaBuilder()
+						.Type(SchemaValueType.String)
+					),
+					("rename-this-required-string", new JsonSchemaBuilder()
+						.Type(SchemaValueType.String)
 					),
 					("ListOfBool", new JsonSchemaBuilder()
 						.Type(SchemaValueType.Array)
@@ -223,6 +243,15 @@ namespace Json.Schema.Generation.Tests
 					("Target", JsonSchemaBuilder.RefRoot()),
 					("rename-this", new JsonSchemaBuilder().Type(SchemaValueType.String)),
 					("StrictNumber", new JsonSchemaBuilder().Type(SchemaValueType.Number)),
+					("OtherStrictNumber", new JsonSchemaBuilder().Type(SchemaValueType.Number)),
+					("ReadOnlyNumber", new JsonSchemaBuilder()
+						.Type(SchemaValueType.Number)
+						.ReadOnly(true)
+					),
+					("WriteOnlyNumber", new JsonSchemaBuilder()
+						.Type(SchemaValueType.Number)
+						.WriteOnly(true)
+					),
 					("StringyNumber", new JsonSchemaBuilder().Type(SchemaValueType.String | SchemaValueType.Number)),
 					("NotANumber", new JsonSchemaBuilder()
 						.AnyOf(new JsonSchemaBuilder().Type(SchemaValueType.Number),
@@ -233,9 +262,14 @@ namespace Json.Schema.Generation.Tests
 						.AnyOf(new JsonSchemaBuilder().Type(SchemaValueType.String | SchemaValueType.Number),
 							new JsonSchemaBuilder().Enum("NaN", "Infinity", "-Infinity")
 						)
+					),
+					("Metadata", new JsonSchemaBuilder()
+						.Type(SchemaValueType.String)
+						.Title("title")
+						.Description("description")
 					)
 				)
-				.Required(nameof(GenerationTarget.Integer))
+				.Required(nameof(GenerationTarget.Integer), "RequiredString", "rename-this-required-string")
 				.Defs(
 					("integer", new JsonSchemaBuilder()
 						.Type(SchemaValueType.Integer)
@@ -245,9 +279,7 @@ namespace Json.Schema.Generation.Tests
 
 			JsonSchema actual = new JsonSchemaBuilder().FromType<GenerationTarget>();
 
-			Console.WriteLine(JsonSerializer.Serialize(expected, new JsonSerializerOptions{WriteIndented = true}));
-			Console.WriteLine(JsonSerializer.Serialize(actual, new JsonSerializerOptions{WriteIndented = true}));
-			Assert.AreEqual(expected, actual);
+			AssertEqual(expected, actual);
 		}
 	}
 }

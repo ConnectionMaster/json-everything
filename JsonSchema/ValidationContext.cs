@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Text.Json;
 using Json.Pointer;
 
@@ -28,8 +26,8 @@ namespace Json.Schema
 		private List<ValidationContext>? _siblingContexts;
 		private Dictionary<string, JsonSchema>? _dynamicAnchors;
 		private JsonSchema? _currentAnchorBackup;
-		private Dictionary<string, JsonSchema>? _dynamicAnchorBackups;
 		private bool _isConsolidating;
+		private HashSet<string>? _navigatedReferences;
 
 		/// <summary>
 		/// Indicates whether the validation passed or failed.
@@ -102,14 +100,18 @@ namespace Json.Schema
 		/// </summary>
 		public JsonSchema? CurrentAnchor { get; internal set; }
 		/// <summary>
-		/// Get the set of defined dynamic anchors.
+		/// (Obsolete) Get the set of defined dynamic anchors.
 		/// </summary>
+		[Obsolete("This is no longer used. Dynamic anchors are tracked with the registry now.")]
 		public Dictionary<string, JsonSchema> DynamicAnchors => _dynamicAnchors ??= new Dictionary<string, JsonSchema>();
 
 		internal bool UriChanged { get; set; }
 		internal ValidationContext ParentContext { get; set; }
 		internal JsonPointer? Reference { get; set; }
 		internal IReadOnlyDictionary<Uri, bool>? MetaSchemaVocabs { get; set; }
+		internal bool IsNewDynamicScope { get; set; }
+		internal HashSet<string> NavigatedReferences => _navigatedReferences ??= new HashSet<string>();
+		internal bool NavigatedByDirectRef { get; set; }
 
 		/// <summary>
 		/// Whether processing optimizations can be applied (output format = flag).
@@ -147,23 +149,22 @@ namespace Json.Schema
 		                                     Uri? newUri = null)
 		{
 			return new ValidationContext(source.Options)
-				{
-					InstanceRoot = source.InstanceRoot,
-					SchemaRoot = source.SchemaRoot,
-					SchemaLocation = subschemaLocation ?? source.SchemaLocation,
-					LocalSchema = source.LocalSchema,
-					InstanceLocation = instanceLocation ?? source.InstanceLocation,
-					LocalInstance = instance?.Clone() ?? source.LocalInstance.Clone(),
-					_currentAnchorBackup = source.CurrentAnchor,
-					CurrentAnchor = source.CurrentAnchor,
-					CurrentUri = newUri ?? source.CurrentUri,
-					Reference = source.Reference,
-					_dynamicAnchorBackups = source.DynamicAnchors.Any()
-						? new Dictionary<string, JsonSchema>(source.DynamicAnchors)
-						: null,
-					_dynamicAnchors = new Dictionary<string, JsonSchema>(source.DynamicAnchors),
-					UriChanged = source.UriChanged
-				};
+			{
+				InstanceRoot = source.InstanceRoot,
+				SchemaRoot = source.SchemaRoot,
+				SchemaLocation = subschemaLocation ?? source.SchemaLocation,
+				LocalSchema = source.LocalSchema,
+				InstanceLocation = instanceLocation ?? source.InstanceLocation,
+				LocalInstance = instance?.Clone() ?? source.LocalInstance.Clone(),
+				_currentAnchorBackup = source.CurrentAnchor,
+				CurrentAnchor = source.CurrentAnchor,
+				CurrentUri = newUri ?? source.CurrentUri,
+				Reference = source.Reference,
+				UriChanged = source.UriChanged || source.CurrentUri != newUri,
+				_navigatedReferences = source._navigatedReferences == null || instance != null
+					? null
+					: new HashSet<string>(source._navigatedReferences)
+			};
 		}
 
 		internal void ImportAnnotations(ValidationContext? context)
@@ -174,16 +175,6 @@ namespace Json.Schema
 		internal void ValidateAnchor()
 		{
 			CurrentAnchor = _currentAnchorBackup;
-		}
-
-		internal void ValidateDynamicAnchor(string value)
-		{
-			if (_dynamicAnchorBackups == null) return;
-
-			if (_dynamicAnchorBackups.TryGetValue(value, out var schema))
-				DynamicAnchors[value] = schema;
-			else
-				DynamicAnchors.Remove(value);
 		}
 
 		/// <summary>

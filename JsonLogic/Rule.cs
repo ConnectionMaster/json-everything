@@ -75,7 +75,10 @@ namespace Json.Logic
 		public override Rule Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 		{
 			if (reader.TokenType != JsonTokenType.StartObject)
-				return new LiteralRule(JsonDocument.ParseValue(ref reader).RootElement);
+			{
+				using var doc = JsonDocument.ParseValue(ref reader);
+				return new LiteralRule(doc.RootElement.Clone());
+			}
 
 			var data = JsonSerializer.Deserialize<Dictionary<string, ArgumentCollection>>(ref reader, options);
 			
@@ -85,6 +88,8 @@ namespace Json.Logic
 			var ruleInfo = data.First();
 			
 			var ruleType = RuleRegistry.GetRule(ruleInfo.Key);
+			if (ruleType == null)
+				throw new JsonException($"Cannot identify rule for {ruleInfo.Key}");
 
 			var value = ruleInfo.Value ?? new ArgumentCollection((Rule?) null);
 

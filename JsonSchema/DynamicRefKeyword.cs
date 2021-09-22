@@ -36,6 +36,7 @@ namespace Json.Schema
 		/// <param name="context">Contextual details for the validation process.</param>
 		public void Validate(ValidationContext context)
 		{
+			context.EnterKeyword(Name);
 			var parts = Reference.OriginalString.Split(new[] {'#'}, StringSplitOptions.None);
 			var baseUri = parts[0];
 			var fragment = parts.Length > 1 ? parts[1] : null;
@@ -45,33 +46,45 @@ namespace Json.Schema
 			if (!string.IsNullOrEmpty(baseUri))
 			{
 				if (Uri.TryCreate(baseUri, UriKind.Absolute, out newUri))
-					baseSchema = context.Options.SchemaRegistry.Get(newUri);
+					baseSchema = context.Options.SchemaRegistry.GetDynamic(newUri, fragment);
 				else if (context.CurrentUri != null)
 				{
 					var uriFolder = context.CurrentUri.OriginalString.EndsWith("/")
 						? context.CurrentUri
 						: context.CurrentUri.GetParentUri();
 					newUri = new Uri(uriFolder, baseUri);
-					baseSchema = context.Options.SchemaRegistry.Get(newUri);
+					baseSchema = context.Options.SchemaRegistry.GetDynamic(newUri, fragment);
 				}
 			}
 			else
 			{
 				newUri = context.CurrentUri;
-				if (fragment != null && context.DynamicAnchors.TryGetValue(fragment, out var dynamicSchema))
-					baseSchema = dynamicSchema;
-				baseSchema ??= context.Options.SchemaRegistry.Get(newUri) ?? context.SchemaRoot;
+				baseSchema ??= context.Options.SchemaRegistry.GetDynamic(newUri, fragment) ?? context.SchemaRoot;
 			}
+
+			var absoluteReference = SchemaRegistry.GetFullReference(newUri, fragment);
+			if (context.NavigatedReferences.Contains(absoluteReference))
+			{
+				context.IsValid = false;
+				context.Message = "Encountered recursive reference";
+				context.ExitKeyword(Name, context.IsValid);
+				return;
+			}
+
+			context.NavigatedReferences.Add(absoluteReference);
 
 			JsonSchema? schema;
 			if (!string.IsNullOrEmpty(fragment) && AnchorKeyword.AnchorPattern.IsMatch(fragment!))
-				schema = baseSchema ?? context.Options.SchemaRegistry.Get(newUri, fragment);
+			{
+				schema = baseSchema ?? context.Options.SchemaRegistry.GetDynamic(newUri, fragment);
+			}
 			else
 			{
 				if (baseSchema == null)
 				{
 					context.IsValid = false;
 					context.Message = $"Could not resolve base URI `{baseUri}`";
+					context.ExitKeyword(Name, context.IsValid);
 					return;
 				}
 
@@ -82,6 +95,7 @@ namespace Json.Schema
 					{
 						context.IsValid = false;
 						context.Message = $"Could not parse pointer `{fragment}`";
+						context.ExitKeyword(Name, context.IsValid);
 						return;
 					}
 
@@ -95,6 +109,7 @@ namespace Json.Schema
 			{
 				context.IsValid = false;
 				context.Message = $"Could not resolve DynamicReference `{Reference}`";
+				context.ExitKeyword(Name, context.IsValid);
 				return;
 			}
 
@@ -105,6 +120,7 @@ namespace Json.Schema
 			context.NestedContexts.Add(subContext);
 			context.ConsolidateAnnotations();
 			context.IsValid = subContext.IsValid;
+			context.ExitKeyword(Name, context.IsValid);
 		}
 
 		/// <summary>Indicates whether the current object is equal to another object of the same type.</summary>

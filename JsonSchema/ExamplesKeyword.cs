@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Json.More;
-using Json.Pointer;
 
 namespace Json.Schema
 {
@@ -52,8 +51,10 @@ namespace Json.Schema
 		/// <param name="context">Contextual details for the validation process.</param>
 		public void Validate(ValidationContext context)
 		{
+			context.EnterKeyword(Name);
 			context.SetAnnotation(Name, Values);
 			context.IsValid = true;
+			context.ExitKeyword(Name, context.IsValid);
 		}
 
 		/// <summary>Indicates whether the current object is equal to another object of the same type.</summary>
@@ -86,7 +87,7 @@ namespace Json.Schema
 	{
 		public override ExamplesKeyword Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 		{
-			var document = JsonDocument.ParseValue(ref reader);
+			using var document = JsonDocument.ParseValue(ref reader);
 
 			if (document.RootElement.ValueKind != JsonValueKind.Array)
 				throw new JsonException("Expected array");

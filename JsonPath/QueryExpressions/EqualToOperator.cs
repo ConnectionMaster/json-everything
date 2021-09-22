@@ -9,19 +9,23 @@ namespace Json.Path.QueryExpressions
 
 		public QueryExpressionType GetOutputType(QueryExpressionNode left, QueryExpressionNode right)
 		{
-			if (left.OutputType != right.OutputType) return QueryExpressionType.Invalid;
-			if (left.OutputType == QueryExpressionType.Invalid) return QueryExpressionType.Invalid;
+			if (left.OutputType == QueryExpressionType.Invalid ||
+			    right.OutputType == QueryExpressionType.Invalid)
+				return QueryExpressionType.Invalid;
 			return QueryExpressionType.Boolean;
 		}
 
-		public JsonElement Evaluate(QueryExpressionNode left, QueryExpressionNode right, JsonElement element)
+		public JsonElementProxy Evaluate(QueryExpressionNode left, QueryExpressionNode right, JsonElement element)
 		{
-			return left.Evaluate(element).IsEquivalentTo(right.Evaluate(element)).AsJsonElement();
+			return left.Evaluate(element).IsEquivalentTo(right.Evaluate(element));
 		}
 
 		public string ToString(QueryExpressionNode left, QueryExpressionNode right)
 		{
-			return $"{left}=={right}";
+			var lString = left.MaybeAddParentheses(OrderOfOperation);
+			var rString = right.MaybeAddParentheses(OrderOfOperation);
+
+			return $"{lString}=={rString}";
 		}
 	}
 }

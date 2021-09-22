@@ -40,9 +40,11 @@ namespace Json.Schema
 		/// <param name="context">Contextual details for the validation process.</param>
 		public void Validate(ValidationContext context)
 		{
+			context.EnterKeyword(Name);
 			context.IsValid = Value.IsEquivalentTo(context.LocalInstance);
 			if (!context.IsValid)
 				context.Message = "Expected value to match given value";
+			context.ExitKeyword(Name, context.IsValid);
 		}
 
 		/// <summary>Indicates whether the current object is equal to another object of the same type.</summary>
@@ -75,7 +77,8 @@ namespace Json.Schema
 	{
 		public override ConstKeyword Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 		{
-			var element = JsonDocument.ParseValue(ref reader).RootElement;
+			using var document = JsonDocument.ParseValue(ref reader);
+			var element = document.RootElement;
 
 			return new ConstKeyword(element);
 		}

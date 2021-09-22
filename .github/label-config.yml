@@ -10,6 +10,12 @@
 "pkg:schema-data":
   - JsonSchema.Data/**/*
 
+"pkg:schema-unique-keys":
+  - JsonSchema.UniqueKeys/**/*
+
+"pkg:logic":
+  - JsonLogic/**/*
+
 "pkg:pointer":
   - JsonPointer/**/*
 
@@ -21,3 +27,9 @@
 
 "documentation":
   - docs_source/**/*
+
+"build pipeline":
+  - .github/workflows/**/*
+
+"try-me-site":
+  - TryJsonEverything/**/*

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -14,6 +15,7 @@ namespace Json.Schema
 	/// Represents a JSON Schema.
 	/// </summary>
 	[JsonConverter(typeof(SchemaJsonConverter))]
+	[DebuggerDisplay("{ToDebugString()}")]
 	public class JsonSchema : IRefResolvable, IEquatable<JsonSchema>
 	{
 		/// <summary>
@@ -95,7 +97,8 @@ namespace Json.Schema
 		/// <returns>A <see cref="ValidationResults"/> that provides the outcome of the validation.</returns>
 		public ValidationResults Validate(JsonElement root, ValidationOptions? options = null)
 		{
-			options ??= ValidationOptions.Default;
+			options = ValidationOptions.From(options ?? ValidationOptions.Default);
+			SchemaRegistry.Initialize();
 
 			var context = new ValidationContext(options)
 				{
@@ -106,6 +109,7 @@ namespace Json.Schema
 					SchemaRoot = this
 				};
 
+			options.Log.Write(() => "Registering subschemas.");
 			var baseUri = RegisterSubschemasAndGetBaseUri(context.Options.SchemaRegistry, BaseUri ?? context.Options.DefaultBaseUri);
 			if (baseUri != null && baseUri.IsAbsoluteUri)
 				BaseUri = baseUri;
@@ -116,8 +120,10 @@ namespace Json.Schema
 
 			context.Options.SchemaRegistry.Register(context.CurrentUri, this);
 
+			options.Log.Write(() => "Beginning validation.");
 			ValidateSubschema(context);
 
+			options.Log.Write(() => "Transforming output.");
 			var results = new ValidationResults(context);
 			switch (options.OutputFormat)
 			{
@@ -136,6 +142,7 @@ namespace Json.Schema
 					throw new ArgumentOutOfRangeException();
 			}
 
+			options.Log.Write(() => $"Validation complete: {results.IsValid.GetValidityString()}");
 			return results;
 		}
 
@@ -154,7 +161,10 @@ namespace Json.Schema
 			if (Keywords == null) return null; // boolean cases
 
 			var idKeyword = Keywords.OfType<IdKeyword>().SingleOrDefault();
-			if (idKeyword != null)
+			var refKeyword = Keywords.OfType<RefKeyword>().SingleOrDefault();
+			var refMatters = refKeyword != null &&
+			                 (registry.ValidatingAs == Draft.Draft6 || registry.ValidatingAs == Draft.Draft7);
+			if (idKeyword != null && !refMatters)
 			{
 				currentUri = idKeyword.UpdateUri(currentUri);
 				var parts = idKeyword.Id.OriginalString.Split(new[] {'#'}, StringSplitOptions.None);
@@ -167,9 +177,11 @@ namespace Json.Schema
 					registry.RegisterAnchor(currentUri, fragment, this);
 			}
 
-			var anchorKeyword = Keywords.OfType<AnchorKeyword>().SingleOrDefault();
-			if (anchorKeyword != null) 
-				registry.RegisterAnchor(currentUri, anchorKeyword.Anchor, this);
+			var anchors = Keywords.OfType<IAnchorProvider>();
+			foreach (var anchor in anchors)
+			{
+				anchor.RegisterAnchor(registry, currentUri, this);
+			}
 
 			var keywords = Keywords.OfType<IRefResolvable>().OrderBy(k => ((IJsonSchemaKeyword)k).Priority());
 			foreach (var keyword in keywords)
@@ -188,6 +200,7 @@ namespace Json.Schema
 		{
 			if (BoolValue.HasValue)
 			{
+				context.Log(() => $"Found {(BoolValue.Value ? "true" : "false")} schema: {BoolValue.Value.GetValidityString()}");
 				context.IsValid = BoolValue.Value;
 				context.SchemaLocation = context.SchemaLocation.Combine(PointerSegment.Create($"${BoolValue}".ToLowerInvariant()));
 				if (!context.IsValid)
@@ -205,17 +218,22 @@ namespace Json.Schema
 				var previousContext = newContext;
 				newContext = ValidationContext.From(context,
 					subschemaLocation: context.SchemaLocation.Combine(PointerSegment.Create(keyword.Keyword())));
+				newContext.NavigatedByDirectRef = context.NavigatedByDirectRef;
 				newContext.ParentContext = context;
 				newContext.LocalSchema = this;
 				newContext.ImportAnnotations(previousContext);
 				if (context.HasNestedContexts)
 					newContext.SiblingContexts.AddRange(context.NestedContexts);
 				keyword.Validate(newContext);
+				context.IsNewDynamicScope |= newContext.IsNewDynamicScope;
 				overallResult &= newContext.IsValid;
 				if (!overallResult && context.ApplyOptimizations) break;
 				if (!newContext.Ignore)
 					context.NestedContexts.Add(newContext);
 			}
+
+			if (context.IsNewDynamicScope)
+				context.Options.SchemaRegistry.ExitingUriScope();
 
 			context.IsValid = overallResult;
 			if (context.IsValid)
@@ -274,6 +292,12 @@ namespace Json.Schema
 		public static implicit operator JsonSchema(bool value)
 		{
 			return value ? True : False;
+		}
+
+		private string ToDebugString()
+		{
+			var idKeyword = Keywords.OfType<IdKeyword>().SingleOrDefault();
+			return idKeyword?.Id.OriginalString ?? ValidationOptions.Default.DefaultBaseUri.OriginalString;
 		}
 
 		/// <summary>Indicates whether the current object is equal to another object of the same type.</summary>
@@ -364,7 +388,8 @@ namespace Json.Schema
 						var keywordType = SchemaKeywordRegistry.GetImplementationType(keyword);
 						if (keywordType == null)
 						{
-							var element = JsonDocument.ParseValue(ref reader).RootElement;
+							using var document = JsonDocument.ParseValue(ref reader);
+							var element = document.RootElement;
 							otherData[keyword] = element.Clone();
 							break;
 						}

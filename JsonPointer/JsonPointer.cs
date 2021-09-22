@@ -40,7 +40,7 @@ namespace Json.Pointer
 		/// <summary>
 		/// Gets the source string for the pointer.
 		/// </summary>
-		public string Source => _source ??= _BuildSource();
+		public string Source => _source ??= BuildSource();
 
 		/// <summary>
 		/// Gets the collection of pointer segments.
@@ -193,6 +193,21 @@ namespace Json.Pointer
 		/// Creates a new JSON Pointer from a collection of segments.
 		/// </summary>
 		/// <param name="segments">A collection of segments.</param>
+		/// <returns>The JSON Pointer.</returns>
+		/// <remarks>This method creates un-encoded pointers only.</remarks>
+		public static JsonPointer Create(params PointerSegment[] segments)
+		{
+			return new JsonPointer
+				{
+					_segments = segments.ToArray(),
+					Kind = JsonPointerKind.Plain
+				};
+		}
+
+		/// <summary>
+		/// Creates a new JSON Pointer from a collection of segments.
+		/// </summary>
+		/// <param name="segments">A collection of segments.</param>
 		/// <param name="isUriEncoded">Whether the pointer should be URL-encoded.</param>
 		/// <returns>The JSON Pointer.</returns>
 		public static JsonPointer Create(IEnumerable<PointerSegment> segments, bool isUriEncoded)
@@ -332,7 +347,7 @@ namespace Json.Pointer
 			return current;
 		}
 
-		private string _BuildSource()
+		private string BuildSource()
 		{
 			var builder = new StringBuilder();
 			if (IsUriEncoded)

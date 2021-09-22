@@ -1,9 +1,9 @@
-﻿using System;
+﻿using Json.Schema.Generation.Intents;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json.Serialization;
-using Json.Schema.Generation.Intents;
 
 namespace Json.Schema.Generation.Generators
 {
@@ -30,18 +30,28 @@ namespace Json.Schema.Generation.Generators
 			var membersToGenerate = propertiesToGenerate.Cast<MemberInfo>()
 				.Concat(fieldsToGenerate)
 				.Concat(hiddenPropertiesToGenerate)
-				.Concat(hiddenFieldsToGenerate)
-				.OrderBy(m => m.Name);
+				.Concat(hiddenFieldsToGenerate);
+
+			membersToGenerate = context.Configuration.PropertyOrder switch
+			{
+				PropertyOrder.AsDeclared => membersToGenerate.OrderBy(m => m, context.DeclarationOrderComparer),
+				PropertyOrder.ByName => membersToGenerate.OrderBy(m => m.Name),
+				_ => membersToGenerate
+			};
 
 			foreach (var member in membersToGenerate)
 			{
 				var memberAttributes = member.GetCustomAttributes().ToList();
-				var ignoreAttribute = memberAttributes.OfType<JsonIgnoreAttribute>().FirstOrDefault();
+#pragma warning disable 8600 // Assigning null to non-null
+				// ReSharper disable once AssignNullToNotNullAttribute
+				var ignoreAttribute = (Attribute) memberAttributes.OfType<JsonIgnoreAttribute>().FirstOrDefault() ??
+				                      memberAttributes.OfType<JsonExcludeAttribute>().FirstOrDefault();
+#pragma warning restore 8600
 				if (ignoreAttribute != null) continue;
 
-				var memberContext = SchemaGenerationContextCache.Get(member.GetMemberType(), memberAttributes);
+				var memberContext = SchemaGenerationContextCache.Get(member.GetMemberType(), memberAttributes, context.Configuration);
 
-				var name = member.Name;
+				var name = context.Configuration.PropertyNamingMethod(member.Name);
 				var nameAttribute = memberAttributes.OfType<JsonPropertyNameAttribute>().FirstOrDefault();
 				if (nameAttribute != null)
 					name = nameAttribute.Name;
@@ -52,12 +62,18 @@ namespace Json.Schema.Generation.Generators
 				props.Add(name, memberContext);
 
 				if (memberAttributes.OfType<RequiredAttribute>().Any())
-					required.Add(member.Name);
+					required.Add(name);
 			}
 
-			context.Intents.Add(new PropertiesIntent(props)); 
-			if (required.Any())
-				context.Intents.Add(new RequiredIntent(required));
+
+			if (props.Count > 0)
+			{
+				context.Intents.Add(new PropertiesIntent(props));
+
+				if (required.Count > 0)
+					context.Intents.Add(new RequiredIntent(required));
+			}
 		}
+
 	}
 }

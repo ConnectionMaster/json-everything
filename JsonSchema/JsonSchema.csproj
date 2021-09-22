@@ -13,8 +13,8 @@
     <PackageProjectUrl>https://github.com/gregsdennis/json-everything</PackageProjectUrl>
     <RepositoryUrl>https://github.com/gregsdennis/json-everything</RepositoryUrl>
     <PackageTags>json-schema validation schema json</PackageTags>
-    <Version>1.9.3</Version>
-    <FileVersion>1.9.3.0</FileVersion>
+    <Version>1.11.3</Version>
+    <FileVersion>1.11.3.0</FileVersion>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <AssemblyName>JsonSchema.Net</AssemblyName>
@@ -31,7 +31,7 @@
    </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="JetBrains.Annotations" Version="2020.1.0" />
+    <PackageReference Include="JetBrains.Annotations" Version="2021.2.0" />
     <PackageReference Include="System.Text.Json" Version="4.7.2" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
   </ItemGroup>

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Json.Pointer;
 
 namespace Json.Schema
 {
@@ -43,8 +42,10 @@ namespace Json.Schema
 		/// <param name="context">Contextual details for the validation process.</param>
 		public void Validate(ValidationContext context)
 		{
+			context.EnterKeyword(Name);
 			context.IsValid = true;
 			context.Ignore = true;
+			context.ExitKeyword(Name, context.IsValid);
 		}
 
 		IRefResolvable? IRefResolvable.ResolvePointerSegment(string? value)

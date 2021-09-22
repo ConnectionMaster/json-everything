@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -47,6 +46,7 @@ namespace Json.Schema
 		/// <param name="context">Contextual details for the validation process.</param>
 		public void Validate(ValidationContext context)
 		{
+			context.EnterKeyword(Name);
 			context.SetAnnotation(Name, Value.Key);
 
 			var requireValidation = context.Options.RequireFormatValidation;
@@ -57,15 +57,22 @@ namespace Json.Schema
 				{
 					foreach (var formatAssertionId in _formatAssertionIds)
 					{
-						if (!vocabRequirements.TryGetValue(formatAssertionId, out var formatAssertionRequirement)) continue;
-
-						requireValidation = formatAssertionRequirement;
-						break;
+						if (vocabRequirements.TryGetValue(formatAssertionId, out var formatAssertionRequirement))
+						{
+							requireValidation = formatAssertionRequirement;
+							break;
+						}
 					}
 				}
 			}
 
-			context.IsValid = !requireValidation || Value.Validate(context.LocalInstance);
+			string? errorMessage = null;
+			context.IsValid = !requireValidation || Value.Validate(context.LocalInstance, out errorMessage);
+			if (!context.IsValid)
+				context.Message = errorMessage == null
+					? $"Value does not match format '{Value.Key}'"
+					: $"Value does not match format '{Value.Key}': {errorMessage}";
+			context.ExitKeyword(Name, context.IsValid);
 		}
 
 		/// <summary>Indicates whether the current object is equal to another object of the same type.</summary>
