@@ -1,0 +1,65 @@
+name: Update Docs
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'src/Json*/**/*'
+      - 'src/Yaml2JsonNode*/**/*'
+      - 'tools/ApiDocsGenerator*/**/*'
+      - '.github/workflows/update-docs.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout docs repo
+        uses: actions/checkout@v4
+        with:
+          repository: json-everything/json-everything-docs
+          path: json-everything-docs
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: 9.0.x
+      - name: Install dependencies
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+      - name: Upload Built Tool
+        uses: actions/upload-artifact@v4
+        with:
+          name: Built Tool
+          path: 'tools/ApiDocsGenerator/bin/Release/net9.0/**/*'
+      - name: Generate docs
+        run: |
+          mkdir -p doc-tool
+          cp -a tools/ApiDocsGenerator/bin/Release/net9.0/. doc-tool
+          rm -rf ./json-everything-docs/_docs/api/*/
+          cd ./doc-tool
+          ls
+          dotnet ApiDocsGenerator.dll "../json-everything-docs/_docs"
+      # - name: Upload Generated Files
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: Generated Files
+      #     path: 'json-everything-docs/_docs/api/**/*'
+      - name: Commit
+        run: |
+          cd json-everything-docs
+          git config user.email ci@json-everything.net
+          git config user.name json-everything-ci
+          git add -A
+          git commit -m "regenerated api docs"
+      - name: Push docs
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          SSH_DEPLOY_KEY: ${{ secrets.DOCS_UPDATE_KEY }}
+        with:
+          source-directory: 'json-everything-docs'
+          destination-github-username: 'gregsdennis'
+          destination-repository-name: 'json-everything-docs'
+          user-email: ci@json-everything.net
+          target-branch: main

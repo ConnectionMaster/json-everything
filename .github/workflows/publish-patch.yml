@@ -5,30 +5,36 @@ on:
     branches:
       - master # Default release branch
     paths:
-      - JsonPatch/**
+      - .github/workflows/publish-patch.yml
+      - src/JsonPatch/**
   workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
 
 jobs:
   publish:
     name: build, pack & publish
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v2
         with:
-          dotnet-version: 5.0.100
+          dotnet-version: 9.0.x
       # Publish
       - name: publish patch
         id: publish_patch
-        uses: rohith/publish-nuget@v2
+        uses: alirezanet/publish-nuget@v3.1.0
         with:
-          PROJECT_FILE_PATH: JsonPatch/JsonPatch.csproj
+          PROJECT_FILE_PATH: src/JsonPatch/JsonPatch.csproj
           NUGET_KEY: ${{secrets.NUGET_API_KEY}}
           INCLUDE_SYMBOLS: true
           TAG_FORMAT: patch-v*
+          PACKAGE_NAME: JsonPatch.Net
       - name: archive packages
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: archive-packages
           path: |

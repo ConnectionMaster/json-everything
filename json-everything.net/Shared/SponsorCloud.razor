@@ -1,0 +1,29 @@
+﻿@using JsonEverythingNet.Models
+<div class="bubble-field" style="height: @(Height)px">
+	@foreach (var item in Data)
+	{
+		<div class="tooltip-icon">
+			<SponsorBubble AvatarUrl="@item.AvatarUrl?.OriginalString"
+			               WebsiteUrl="@item.WebsiteUrl?.OriginalString"
+			               Size="@item.BubbleSize"
+			               X="@item.X"
+			               Y="@item.Y">
+			</SponsorBubble>
+			<span class="tooltip-text tooltip-text-small"
+				  style="left: @(item.X + (int)item.BubbleSize)px; top: @(item.Y + (int)item.BubbleSize)px;">
+				@@@item.Username
+			</span>
+		</div>
+	}
+</div>
+
+@code {
+	[Parameter]
+	public IReadOnlyList<SponsorData> Data { get; set; } = [];
+
+	private int Height => Data.Count == 0
+		? 0
+		: (int)Math.Abs(Data.Max(x => x.Y + (int)x.BubbleSize) -
+						Data.Min(x => x.Y - (int)x.BubbleSize));
+
+}

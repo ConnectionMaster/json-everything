@@ -4,12 +4,19 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 # User-specific files
+.notes/
 *.rsuser
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
 Json*.xml
+Yaml*.xml
+/JsonSchema/nuspec/*/*.dll
+doc-tool/*
+!doc-tool/xml
+doc-tool/xml/*
+!doc-tool/xml/JsonSchema.Net.CodeGeneration.xml
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -36,6 +43,9 @@ bld/
 .vs/
 # Uncomment if you have tasks that create the project's static files in wwwroot
 #wwwroot/
+
+# JetBrains
+.idea/
 
 ## dotnet local tools configuration
 .config/

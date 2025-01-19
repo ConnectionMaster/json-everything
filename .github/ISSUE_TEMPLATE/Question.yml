@@ -1,0 +1,61 @@
+name: Question
+description: Just have a question or need some guidance
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to help make this project better!
+  - type: checkboxes
+    id: docs
+    attributes:
+      label: Documentation
+      options:
+        - label: I have consulted the [documentation](https://docs.json-everything.net), and my question isn't answered there.
+          required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Nuget Package
+      description: Which package are you using?
+      options:
+        - json-everything.net (playground)
+        - Json.More.Net
+        - JsonE.Net
+        - JsonLogic
+        - JsonPath.Net
+        - JsonPatch.Net
+        - JsonPointer.Net
+        - JsonSchema.Net
+        - JsonSchema.Net (language pack)
+        - JsonSchema.Net.Data
+        - JsonSchema.Net.DataGeneration
+        - JsonSchema.Net.CodeGeneration
+        - JsonSchema.Net.Generation
+        - JsonSchema.Net.Generation.DataAnnotations
+        - JsonSchema.Net.OpenApi
+        - JsonSchema.Net.UniqueKeys
+        - Yaml2JsonNode
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package Version
+      description: What version of the package are you using?
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: How can I help?  Please provide as much context as possible.
+    validations:
+      required: true
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/json-everything/json-everything/blob/master/CODE_OF_CONDUCT.md)
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

@@ -1,0 +1,71 @@
+"pkg:more":
+- changed-files:
+  - any-glob-to-any-file: src/Json.More/**/*
+
+"pkg:schema":
+- changed-files:
+  - any-glob-to-any-file: src/JsonSchema/**/*
+
+"pkg:schema-generation":
+- changed-files:
+  - any-glob-to-any-file: src/JsonSchema.Generation/**/*
+
+"pkg:schema-generation-dataannotations":
+- changed-files:
+  - any-glob-to-any-file: src/JsonSchema.Generation.DataAnnotations/**/*
+
+"pkg:schema-datagen":
+- changed-files:
+  - any-glob-to-any-file: src/JsonSchema.DataGeneration/**/*
+
+"pkg:schema-codegen":
+- changed-files:
+  - any-glob-to-any-file: src/JsonSchema.CodeGeneration/**/*
+
+"pkg:schema-data":
+- changed-files:
+  - any-glob-to-any-file: src/JsonSchema.Data/**/*
+
+"pkg:schema-openapi":
+- changed-files:
+  - any-glob-to-any-file: src/JsonSchema.OpenApi/**/*
+
+"pkg:schema-unique-keys":
+- changed-files:
+  - any-glob-to-any-file: src/JsonSchema.UniqueKeys/**/*
+
+"pkg:schema-array-ext":
+- changed-files:
+  - any-glob-to-any-file: src/JsonSchema.ArrayExt/**/*
+
+"pkg:logic":
+- changed-files:
+  - any-glob-to-any-file: src/JsonLogic/**/*
+
+"pkg:pointer":
+- changed-files:
+  - any-glob-to-any-file: src/JsonPointer/**/*
+
+"pkg:path":
+- changed-files:
+  - any-glob-to-any-file: src/JsonPath/**/*
+
+"pkg:patch":
+- changed-files:
+  - any-glob-to-any-file: src/JsonPatch/**/*
+
+"pkg:json-e":
+- changed-files:
+  - any-glob-to-any-file: src/JsonE/**/*
+
+"pkg:yaml":
+- changed-files:
+  - any-glob-to-any-file: src/Yaml2JsonNode/**/*
+
+"build pipeline":
+- changed-files:
+  - any-glob-to-any-file: .github/workflows/**/*
+
+"json-everything.net":
+- changed-files:
+  - any-glob-to-any-file: 'json-everything.net/**/*'

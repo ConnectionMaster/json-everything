@@ -1,0 +1,237 @@
+﻿@page "/json-path"
+@using System.Text.Json
+@using Json.Path
+@using JsonEverythingNet.Services
+@using EditorOptions = JsonEverythingNet.Services.EditorOptions
+@using System.Text.Encodings.Web
+@using System.Text.Json.Nodes
+@using BlazorMonaco.Editor
+@using Microsoft.AspNetCore.Components
+
+@inject DataManager DataManager;
+
+<PageTitle>JSON Path - json-everything.net</PageTitle>
+
+<div id="layout" class="flex-grow-1 position-relative">
+	<div class="dimgray fill-remaining">
+		<div class="inner d-flex h-100">
+			<div class="green w-25 d-flex">
+				<div class="tan grid-panel flex-grow-1 scroll">
+					<div class="align-items-center hstack mx-2">
+						<img src="img/json-path.png" height="70" width="70" class="me-3" />
+						<h1 class="display-4">JSON Path</h1>
+					</div>
+					<div class="align-items-center mx-3">
+						<div>
+							Query JSON data - "XPath for JSON". Learn more about
+							<a href="https://www.rfc-editor.org/rfc/rfc9535.html" target="_blank">JSON Path (RFC 9535)<ExternalLinkIcon/></a>
+						</div>
+					</div>
+					<div class="align-items-center mt-1">
+						@foreach (var library in _libraries)
+						{
+						<NugetLibrary Library="@library"/>
+						}
+					</div>
+					<hr />
+					<EditForm Model="_options" class="vstack">
+						<label class="my-2">
+							<InputCheckbox @bind-Value="_options.TolerateExtraWhitespace" DisplayName="Tolerate extra whitespace"/>
+							Tolerate extra whitespace
+							<span class="tooltip-icon">
+								ⓘ
+								<span class="tooltip-text">
+									<MarkdownSpan Content="@HelpContent.PathExtraWhitespace"></MarkdownSpan>
+								</span>
+							</span>
+						</label>
+						<label class="my-2">
+							<InputCheckbox @bind-Value="_options.AllowJsonConstructs" DisplayName="Allow JSON literals"/>
+							Allow JSON literals
+							<span class="tooltip-icon">
+								ⓘ
+								<span class="tooltip-text">
+									<MarkdownSpan Content="@HelpContent.PathJsonLiterals"></MarkdownSpan>
+								</span>
+							</span>
+						</label>
+						<label class="my-2">
+							<InputCheckbox @bind-Value="_options.AllowInOp" DisplayName="Allow in operator"/>
+							Allow <span class="font-monospace">in</span> operator
+							<span class="tooltip-icon">
+								ⓘ
+								<span class="tooltip-text">
+									<MarkdownSpan Content="@HelpContent.PathJsonInOperator"></MarkdownSpan>
+								</span>
+							</span>
+						</label>
+						<label class="my-2">
+							<InputCheckbox @bind-Value="_options.AllowMathOps" DisplayName="Allow math operators"/>
+							Allow math operators
+							<span class="tooltip-icon">
+								ⓘ
+								<span class="tooltip-text">
+									<MarkdownSpan Content="@HelpContent.PathMathOperators"></MarkdownSpan>
+								</span>
+							</span>
+						</label>
+						<label class="my-2">
+							<InputCheckbox @bind-Value="_options.AllowRelativeStart" DisplayName="Allow starting with @@"/>
+							Allow starting path with <span class="font-monospace">@@</span>
+							<span class="tooltip-icon">
+								ⓘ
+								<span class="tooltip-text">
+									<MarkdownSpan Content="@HelpContent.PathRelativeStart"></MarkdownSpan>
+								</span>
+							</span>
+						</label>
+						<button class="btn btn-primary w-100" @onclick="Evaluate">Evaluate</button>
+					</EditForm>
+					<hr/>
+					<MarkdownSpan Content="@HelpContent.PathEvaluate"></MarkdownSpan>
+				</div>
+			</div>
+			<div class="gray d-flex flex-grow-1 flex-column">
+				<div class="maroon d-flex flex-grow-1 flex-column">
+					<div class="yellow mx-2 d-flex flex-grow-1">
+						<EditForm Model="_input" class="col-12">
+							<label class="mb-2 w-100">
+								Path
+								<InputText @bind-Value="_input.Path" DisplayName="Path" class="form-control"
+								           @oninput="SavePath"/>
+							</label>
+						</EditForm>
+					</div>
+					<div class="palegreen d-flex h-100">
+						<div class="pink w-50 d-flex flex-grow-1">
+							<div class="grid-panel flex-grow-1 position-relative">
+								<span class="editor-lang-json">JSON</span>
+								<StandaloneCodeEditor @ref="_instanceEditor" Id="editor-instance" ConstructionOptions="BasicOptions"
+								                      CssClass="h-100"/>
+							</div>
+						</div>
+						<div class="cyan w-50 d-flex flex-grow-1">
+							<div class="grid-panel flex-grow-1">
+								<StandaloneCodeEditor @ref="_outputEditor" Id="editor-output" ConstructionOptions="ReadOnlyOptions"
+								                      CssClass="h-100"/>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+@code {
+	#pragma warning disable CS8618
+	private StandaloneCodeEditor _instanceEditor;
+	private StandaloneCodeEditor _outputEditor;
+
+	private readonly InputModel _input = new();
+
+	private readonly PathOptionsModel _options = new();
+
+	private readonly List<LibraryVersion> _libraries = [LibraryVersion.GetFor<JsonPath>()];
+#pragma warning restore CS8618
+
+	private class InputModel
+	{
+		public string? Path { get; set; }
+	}
+
+	private class PathOptionsModel
+	{
+		public bool AllowMathOps { get; set; }
+		public bool AllowRelativeStart { get; set; }
+		public bool AllowJsonConstructs { get; set; }
+		public bool TolerateExtraWhitespace { get; set; }
+		public bool AllowInOp { get; set; }
+
+		public PathParsingOptions ToEvaluationOptions() => new()
+		{
+			AllowMathOperations = AllowMathOps,
+			AllowRelativePathStart = AllowRelativeStart,
+			AllowJsonConstructs = AllowJsonConstructs,
+			TolerateExtraWhitespace = TolerateExtraWhitespace,
+			AllowInOperator = AllowInOp
+		};
+	}
+
+	private static StandaloneEditorConstructionOptions BasicOptions(StandaloneCodeEditor _) => EditorOptions.Basic();
+	private static StandaloneEditorConstructionOptions ReadOnlyOptions(StandaloneCodeEditor _) => EditorOptions.Readonly();
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			await LoadSavedPath();
+			await LoadSavedInstance();
+			await _outputEditor.SetValue(string.Empty);
+		}
+
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	private async Task Evaluate()
+	{
+		await SaveInstance();
+		await _outputEditor.SetValue(string.Empty);
+
+		JsonPath path;
+		try
+		{
+			var options = _options.ToEvaluationOptions();
+			path = JsonPath.Parse(_input.Path!, options);
+		}
+		catch (Exception e)
+		{
+			await _outputEditor.SetValue($"Path is invalid\n\n{e.Message}");
+			return;
+		}
+		JsonNode? instance;
+		try
+		{
+			instance = JsonNode.Parse(await _instanceEditor.GetValue());
+		}
+		catch (Exception e)
+		{
+			await _outputEditor.SetValue($"Data is invalid\n\n{e.Message}");
+			return;
+		}
+
+		var results = path.Evaluate(instance);
+
+		var resultText = JsonSerializer.Serialize(results.Matches, new JsonSerializerOptions
+			{
+				WriteIndented = true,
+				Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+			});
+
+		await _outputEditor.SetValue(resultText);
+	}
+
+	private async Task SavePath(ChangeEventArgs args)
+	{
+		var pathText = args.Value as string;
+
+		await DataManager.Set("path", pathText ?? string.Empty);
+	}
+
+	private async Task LoadSavedPath()
+	{
+		var pathText = await DataManager.Get("path") ?? string.Empty;
+
+		_input.Path = pathText;
+	}
+
+	private async Task SaveInstance()
+	{
+		await DataManager.SaveEditorValue(_instanceEditor, "path-instance");
+	}
+
+	private async Task LoadSavedInstance()
+	{
+		await DataManager.LoadEditorValue(_instanceEditor, "path-instance");
+	}
+}

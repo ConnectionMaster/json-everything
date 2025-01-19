@@ -4,47 +4,63 @@ on:
   push:
     branches: [ master ]
     paths:
-      - 'Json*/**/*'
+      - 'src/Json*/**/*'
+      - 'src/Yaml2JsonNode*/**/*'
       - 'ref-repos/**/*'
+      - '.github/workflows/dotnet-core.yml'
   pull_request:
     paths:
-      - 'Json*/**/*'
+      - 'src/Json*/**/*'
+      - 'src/Yaml2JsonNode*/**/*'
       - 'ref-repos/**/*'
+      - '.github/workflows/dotnet-core.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: restore submodules
         run: git submodule update --init
       - name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v2
         with:
-          dotnet-version: 3.1.301
-      - name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 5.0.100
-
+          dotnet-version: |
+            8.0.x
+            9.0.x
       - name: Install dependencies
         run: dotnet restore
       - name: Build
         run: dotnet build --configuration Release --no-restore
       - name: Test
-        run: dotnet test --no-restore --verbosity normal --logger:"junit;LogFileName=test-results.xml"
-      - name: Upload DLLs for analysis
-        uses: actions/upload-artifact@v2
+        run: dotnet test --no-restore --verbosity normal --logger:"trx;LogFileName=test-results.trx"
+      - name: Test Report
+        uses: dorny/test-reporter@v1.7.0
+        if: always()
         with:
-          name: DLLs
-          path: '**/bin/Release/*/*.dll'
+          name: .NET Tests
+          path: '**/test-results.trx'
+          reporter: dotnet-trx
+          fail-on-empty: 'true'
       - name: Upload Unit Test Results
         if: always()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: Unit Test Results
-          path: '**/*/test-results.xml'
+          path: '**/*/test-results.trx'
+      - name: Upload Packages for Inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Packages
+          path: '**/*/*.nupkg'
 
   test-results:
     runs-on: ubuntu-latest
@@ -53,590 +69,45 @@ jobs:
     name: Publish Unit Test Results
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
       - name: Publish Unit Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v1.6
+        uses: EnricoMi/publish-unit-test-result-action/composite@v2
         if: always()
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          files: '**/*/test-results.xml'
+          files: '**/*/test-results.trx'
 
   test-badge:
-    needs: build
     runs-on: ubuntu-latest
-    steps:
-    - name: Extract Branch Name
-      run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
-    - name: Download Artifacts
-      uses: actions/download-artifact@v2
-      with:
-        path: artifacts
-    - name: Get badge details
-      run: |
-        find . -name test-results.xml -exec cat '{}' >> all-results.xml \;
-        TEST_COUNT=`grep -Pio '(?<=tests=")\d+' all-results.xml | awk '{ SUM += $1} END { print SUM }'`
-        echo "FAIL_COUNT=`grep -Pio '(?<=failures=")\d+' all-results.xml | awk '{ SUM += $1} END { print SUM }'`" >> $GITHUB_ENV
-        echo "PASS_COUNT=$((TEST_COUNT - FAIL_COUNT))" >> $GITHUB_ENV
-        if [[ $FAIL_COUNT -eq 0 ]]
-        then
-          echo "BUILD_STATUS=success" >> $GITHUB_ENV
-        else
-          echo "BUILD_STATUS=critical" >> $GITHUB_ENV
-        fi
-    - name: Create test results badge
-      if: env.BRANCH == 'master'
-      uses: schneegans/dynamic-badges-action@v1.0.0
-      with:
-        auth: ${{ secrets.TEST_BADGE_KEY }}
-        gistID: 28607f2d276032f4d9a7f2c807e44df7
-        filename: test-results-badge.json
-        label: tests
-        message: ${{ format('{0} passing | {1} failing', env.PASS_COUNT, env.FAIL_COUNT) }}
-        color: ${{ env.BUILD_STATUS }}
-
-  analyze-more:
-    if: github.event_name == 'pull_request'
     needs: build
-    name: Analyze Json.More.Net 
-    runs-on: ubuntu-latest
+    if: success() || failure()
     steps:
-      - uses: marceloprado/has-changed-path@v1
-        id: changed-more
-        with:
-          paths: Json.More/**
-      - if: steps.changed-more.outputs.changed == 'true'
-        uses: actions/checkout@v2
-      - if: steps.changed-more.outputs.changed == 'true'
-        name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 3.1.301
-
-      - if: steps.changed-more.outputs.changed == 'true'
-        name: Download Artifacts
-        uses: actions/download-artifact@v2
+      - name: Extract Branch Name
+        run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
-
-        # Set up
-      - if: steps.changed-more.outputs.changed == 'true'
-        name: Create local manifest file
-        run: dotnet new tool-manifest
-      - if: steps.changed-more.outputs.changed == 'true'
-        name: Install analyzer
-        run: dotnet tool install SemVerAnalyzer
-
-      - if: steps.changed-more.outputs.changed == 'true'
-        name: Analyze more
-        id: analyze-more
-        # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
+      - name: Get badge details
         run: |
-          dotnet analyze-semver -a artifacts/DLLs/Json.More/bin/Release/netstandard2.0/Json.More.dll -o semver-report-more.md -c .github/semver_config.json -p Json.More.Net
-          unset HAS_REPORT
-          unset REPORT
-          if [ -s semver-report-more.md ]
+          find . -name test-results.trx -exec cat '{}' >> all-results.xml \;
+          echo "FAIL_COUNT=`grep -Pio '(?<=failed=")\d+' all-results.xml | awk '{ SUM += $1} END { print SUM }'`" >> $GITHUB_ENV
+          echo "PASS_COUNT=`grep -Pio '(?<=passed=")\d+' all-results.xml | awk '{ SUM += $1} END { print SUM }'`" >> $GITHUB_ENV
+          if [[ $FAIL_COUNT -eq 0 ]]
           then
-            HAS_REPORT='true'
-            REPORT=$(<semver-report-more.md)
-            REPORT="${REPORT//'%'/'%25'}"
-            REPORT="${REPORT//$'\n'/'%0A'}"
-            REPORT="${REPORT//$'\r'/'%0D'}"
-            echo "::set-output name=REPORT::${REPORT}"
+            echo "BUILD_STATUS=success" >> $GITHUB_ENV
+          else
+            echo "BUILD_STATUS=critical" >> $GITHUB_ENV
           fi
-          echo ::set-output name=HAS_REPORT::${HAS_REPORT}
-
-        # Report
-      - if: steps.analyze-more.outputs.HAS_REPORT
-        uses: unsplash/comment-on-pr@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create test results badge
+        if: env.BRANCH == 'master'
+        uses: schneegans/dynamic-badges-action@v1.0.0
         with:
-          msg: |
-            ${{ steps.analyze-more.outputs.REPORT }}
-
-  analyze-patch:
-    if: github.event_name == 'pull_request'
-    needs: build
-    name: Analyze JsonPatch.Net
-    runs-on: ubuntu-latest
-    steps:
-      - uses: marceloprado/has-changed-path@v1
-        id: changed-patch
-        with:
-          paths: JsonPatch/**
-      - if: steps.changed-patch.outputs.changed == 'true'
-        uses: actions/checkout@v2
-      - if: steps.changed-patch.outputs.changed == 'true'
-        name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 3.1.301
-
-      - if: steps.changed-patch.outputs.changed == 'true'
-        name: Download Artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: artifacts
-
-        # Set up
-      - if: steps.changed-patch.outputs.changed == 'true'
-        name: Create local manifest file
-        run: dotnet new tool-manifest
-      - if: steps.changed-patch.outputs.changed == 'true'
-        name: Install analyzer
-        run: dotnet tool install SemVerAnalyzer
-
-      - if: steps.changed-patch.outputs.changed == 'true'
-        name: Analyze patch
-        id: analyze-patch
-        # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
-        run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonPatch/bin/Release/netstandard2.0/JsonPatch.dll -o semver-report-patch.md -c .github/semver_config.json -p JsonPatch.Net
-          unset HAS_REPORT
-          unset REPORT
-          if [ -s semver-report-patch.md ]
-          then
-            HAS_REPORT='true'
-            REPORT=$(<semver-report-patch.md)
-            REPORT="${REPORT//'%'/'%25'}"
-            REPORT="${REPORT//$'\n'/'%0A'}"
-            REPORT="${REPORT//$'\r'/'%0D'}"
-            echo "::set-output name=REPORT::${REPORT}"
-          fi
-          echo ::set-output name=HAS_REPORT::${HAS_REPORT}
-      
-        # Report
-      - if: steps.analyze-patch.outputs.HAS_REPORT
-        uses: unsplash/comment-on-pr@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          msg: |
-            ${{ steps.analyze-patch.outputs.REPORT }}
-
-  analyze-path:
-    if: github.event_name == 'pull_request'
-    needs: build
-    name: Analyze JsonPath.Net
-    runs-on: ubuntu-latest
-    steps:
-      - uses: marceloprado/has-changed-path@v1
-        id: changed-path
-        with:
-          paths: JsonPath/**
-      - if: steps.changed-path.outputs.changed == 'true'
-        uses: actions/checkout@v2
-      - if: steps.changed-path.outputs.changed == 'true'
-        name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 3.1.301
-
-      - if: steps.changed-path.outputs.changed == 'true'
-        name: Download Artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: artifacts
-
-        # Set up
-      - if: steps.changed-path.outputs.changed == 'true'
-        name: Create local manifest file
-        run: dotnet new tool-manifest
-      - if: steps.changed-path.outputs.changed == 'true'
-        name: Install analyzer
-        run: dotnet tool install SemVerAnalyzer
-
-      - if: steps.changed-path.outputs.changed == 'true'
-        name: Analyze path
-        id: analyze-path
-        # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
-        run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonPath/bin/Release/netstandard2.1/JsonPath.Net.dll -o semver-report-path.md -c .github/semver_config.json --include-Header
-          unset HAS_REPORT
-          unset REPORT
-          if [ -s semver-report-path.md ]
-          then
-            HAS_REPORT='true'
-            REPORT=$(<semver-report-path.md)
-            REPORT="${REPORT//'%'/'%25'}"
-            REPORT="${REPORT//$'\n'/'%0A'}"
-            REPORT="${REPORT//$'\r'/'%0D'}"
-            echo "::set-output name=REPORT::${REPORT}"
-          fi
-          echo ::set-output name=HAS_REPORT::${HAS_REPORT}
-
-        # Report
-      - if: steps.analyze-path.outputs.HAS_REPORT
-        uses: unsplash/comment-on-pr@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          msg: |
-            ${{ steps.analyze-path.outputs.REPORT }}
-
-  analyze-pointer:
-    if: github.event_name == 'pull_request'
-    needs: build
-    name: Analyze JsonPointer.Net
-    runs-on: ubuntu-latest
-    steps:
-      - uses: marceloprado/has-changed-path@v1
-        id: changed-pointer
-        with:
-          paths: JsonPointer/**
-      - if: steps.changed-pointer.outputs.changed == 'true'
-        uses: actions/checkout@v2
-      - if: steps.changed-pointer.outputs.changed == 'true'
-        name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 3.1.301
-
-      - if: steps.changed-pointer.outputs.changed == 'true'
-        name: Download Artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: artifacts
-
-        # Set up
-      - if: steps.changed-pointer.outputs.changed == 'true'
-        name: Create local manifest file
-        run: dotnet new tool-manifest
-      - if: steps.changed-pointer.outputs.changed == 'true'
-        name: Install analyzer
-        run: dotnet tool install SemVerAnalyzer
-
-      - if: steps.changed-pointer.outputs.changed == 'true'
-        name: Analyze pointer
-        id: analyze-poitner
-        # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
-        run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonPointer/bin/Release/netstandard2.0/JsonPointer.Net.dll -o semver-report-pointer.md -c .github/semver_config.json
-          unset HAS_REPORT
-          unset REPORT
-          if [ -s semver-report-pointer.md ]
-          then
-            HAS_REPORT='true'
-            REPORT=$(<semver-report-pointer.md)
-            REPORT="${REPORT//'%'/'%25'}"
-            REPORT="${REPORT//$'\n'/'%0A'}"
-            REPORT="${REPORT//$'\r'/'%0D'}"
-            echo "::set-output name=REPORT::${REPORT}"
-          fi
-          echo ::set-output name=HAS_REPORT::${HAS_REPORT}
-
-        # Report
-      - if: steps.analyze-pointer.outputs.HAS_REPORT
-        uses: unsplash/comment-on-pr@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          msg: |
-            ${{ steps.analyze-pointer.outputs.REPORT }}
-
-  analyze-schema:
-    if: github.event_name == 'pull_request'
-    needs: build
-    name: Analyze JsonSchema.Net
-    runs-on: ubuntu-latest
-    steps:
-      - uses: marceloprado/has-changed-path@v1
-        id: changed-schema
-        with:
-          paths: JsonSchema/**
-      - if: steps.changed-schema.outputs.changed == 'true'
-        uses: actions/checkout@v2
-      - if: steps.changed-schema.outputs.changed == 'true'
-        name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 3.1.301
-
-      - if: steps.changed-schema.outputs.changed == 'true'
-        name: Download Artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: artifacts
-
-        # Set up
-      - if: steps.changed-schema.outputs.changed == 'true'
-        name: Create local manifest file
-        run: dotnet new tool-manifest
-      - if: steps.changed-schema.outputs.changed == 'true'
-        name: Install analyzer
-        run: dotnet tool install SemVerAnalyzer
-
-      - if: steps.changed-schema.outputs.changed == 'true'
-        name: Analyze schema
-        id: analyze-schema
-        # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
-        run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonSchema/bin/Release/netstandard2.0/JsonSchema.Net.dll -o semver-report-schema.md -c .github/semver_config.json
-          unset HAS_REPORT
-          unset REPORT
-          if [ -s semver-report-schema.md ]
-          then
-            HAS_REPORT='true'
-            REPORT=$(<semver-report-schema.md)
-            REPORT="${REPORT//'%'/'%25'}"
-            REPORT="${REPORT//$'\n'/'%0A'}"
-            REPORT="${REPORT//$'\r'/'%0D'}"
-            echo "::set-output name=REPORT::${REPORT}"
-          fi
-          echo ::set-output name=HAS_REPORT::${HAS_REPORT}
-
-        # Report
-      - if: steps.analyze-schema.outputs.HAS_REPORT
-        uses: unsplash/comment-on-pr@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          msg: |
-            ${{ steps.analyze-schema.outputs.REPORT }}
-
-  analyze-schema-gen:
-    if: github.event_name == 'pull_request'
-    needs: build
-    name: Analyze JsonSchema.Net.Generation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: marceloprado/has-changed-path@v1
-        id: changed-schema-gen
-        with:
-          paths: JsonSchema.Generation/**
-      - if: steps.changed-schema-gen.outputs.changed == 'true'
-        uses: actions/checkout@v2
-      - if: steps.changed-schema-gen.outputs.changed == 'true'
-        name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 3.1.301
-      - if: steps.changed-schema-gen.outputs.changed == 'true'
-        name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 5.0.100
-
-      - if: steps.changed-schema-gen.outputs.changed == 'true'
-        name: Download Artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: artifacts
-
-        # Set up
-      - if: steps.changed-schema-gen.outputs.changed == 'true'
-        name: Create local manifest file
-        run: dotnet new tool-manifest
-      - if: steps.changed-schema-gen.outputs.changed == 'true'
-        name: Install analyzer
-        run: dotnet tool install SemVerAnalyzer
-
-      - if: steps.changed-schema-gen.outputs.changed == 'true'
-        name: Analyze schema generation
-        id: analyze-schema-generation
-        # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
-        run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonSchema.Generation/bin/Release/net5.0/JsonSchema.Net.Generation.dll -o semver-report-schema-gen.md -c .github/semver_config.json
-          unset HAS_REPORT
-          unset REPORT
-          if [ -s semver-report-schema-gen.md ]
-          then
-            HAS_REPORT='true'
-            REPORT=$(<semver-report-schema-gen.md)
-            REPORT="${REPORT//'%'/'%25'}"
-            REPORT="${REPORT//$'\n'/'%0A'}"
-            REPORT="${REPORT//$'\r'/'%0D'}"
-            echo "::set-output name=REPORT::${REPORT}"
-          fi
-          echo ::set-output name=HAS_REPORT::${HAS_REPORT}
-
-        # Report
-      - if: steps.analyze-schema-generation.outputs.HAS_REPORT
-        uses: unsplash/comment-on-pr@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          msg: |
-            ${{ steps.analyze-schema-generation.outputs.REPORT }}
-
-  analyze-schema-data:
-    if: github.event_name == 'pull_request'
-    needs: build
-    name: Analyze JsonSchema.Net.Data
-    runs-on: ubuntu-latest
-    steps:
-      - uses: marceloprado/has-changed-path@v1
-        id: changed-schema-data
-        with:
-          paths: JsonSchema.Data/**
-      - if: steps.changed-schema-data.outputs.changed == 'true'
-        uses: actions/checkout@v2
-      - if: steps.changed-schema-data.outputs.changed == 'true'
-        name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 3.1.301
-
-      - if: steps.changed-schema-data.outputs.changed == 'true'
-        name: Download Artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: artifacts
-
-        # Set up
-      - if: steps.changed-schema-data.outputs.changed == 'true'
-        name: Create local manifest file
-        run: dotnet new tool-manifest
-      - if: steps.changed-schema-data.outputs.changed == 'true'
-        name: Install analyzer
-        run: dotnet tool install SemVerAnalyzer
-
-      - if: steps.changed-schema-data.outputs.changed == 'true'
-        name: Analyze schema data
-        id: analyze-schema-data
-        # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
-        run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonSchema.Data/bin/Release/netstandard2.0/JsonSchema.Net.Data.dll -o semver-report-schema-data.md -c .github/semver_config.json
-          unset HAS_REPORT
-          unset REPORT
-          if [ -s semver-report-schema-data.md ]
-          then
-            HAS_REPORT='true'
-            REPORT=$(<semver-report-schema-data.md)
-            REPORT="${REPORT//'%'/'%25'}"
-            REPORT="${REPORT//$'\n'/'%0A'}"
-            REPORT="${REPORT//$'\r'/'%0D'}"
-            echo "::set-output name=REPORT::${REPORT}"
-          fi
-          echo ::set-output name=HAS_REPORT::${HAS_REPORT}
-
-        # Report
-      - if: steps.analyze-schema-data.outputs.HAS_REPORT
-        uses: unsplash/comment-on-pr@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          msg: |
-            ${{ steps.analyze-schema-data.outputs.REPORT }}
-
-  analyze-schema-unique-keys:
-    if: github.event_name == 'pull_request'
-    needs: build
-    name: Analyze JsonSchema.Net.UniqueKeys
-    runs-on: ubuntu-latest
-    steps:
-      - uses: marceloprado/has-changed-path@v1
-        id: changed-schema-uniquekeys
-        with:
-          paths: JsonSchema.UniqueKeys/**
-      - if: steps.changed-schema-uniquekeys.outputs.changed == 'true'
-        uses: actions/checkout@v2
-      - if: steps.changed-schema-uniquekeys.outputs.changed == 'true'
-        name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 3.1.301
-
-      - if: steps.changed-schema-uniquekeys.outputs.changed == 'true'
-        name: Download Artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: artifacts
-
-        # Set up
-      - if: steps.changed-schema-uniquekeys.outputs.changed == 'true'
-        name: Create local manifest file
-        run: dotnet new tool-manifest
-      - if: steps.changed-schema-uniquekeys.outputs.changed == 'true'
-        name: Install analyzer
-        run: dotnet tool install SemVerAnalyzer
-
-      - if: steps.changed-schema-uniquekeys.outputs.changed == 'true'
-        name: Analyze schema unique keys
-        id: analyze-schema-unique-keys
-        # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
-        run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonSchema.UniqueKeys/bin/Release/netstandard2.0/JsonSchema.Net.UniqueKeys.dll -o semver-report-schema-unique-keys.md -c .github/semver_config.json
-          unset HAS_REPORT
-          unset REPORT
-          if [ -s semver-report-schema-unique-keys.md ]
-          then
-            HAS_REPORT='true'
-            REPORT=$(<semver-report-schema-unique-keys.md)
-            REPORT="${REPORT//'%'/'%25'}"
-            REPORT="${REPORT//$'\n'/'%0A'}"
-            REPORT="${REPORT//$'\r'/'%0D'}"
-            echo "::set-output name=REPORT::${REPORT}"
-          fi
-          echo ::set-output name=HAS_REPORT::${HAS_REPORT}
-
-        # Report
-      - if: steps.analyze-schema-unique-keys.outputs.HAS_REPORT
-        uses: unsplash/comment-on-pr@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          msg: |
-            ${{ steps.analyze-schema-unique-keys.outputs.REPORT }}
-
-  analyze-logic:
-    if: github.event_name == 'pull_request'
-    needs: build
-    name: Analyze JsonLogic
-    runs-on: ubuntu-latest
-    steps:
-      - uses: marceloprado/has-changed-path@v1
-        id: changed-logic
-        with:
-          paths: JsonLogic/**
-      - if: steps.changed-logic.outputs.changed == 'true'
-        uses: actions/checkout@v2
-      - if: steps.changed-logic.outputs.changed == 'true'
-        name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 3.1.301
-
-      - if: steps.changed-logic.outputs.changed == 'true'
-        name: Download Artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: artifacts
-
-        # Set up
-      - if: steps.changed-logic.outputs.changed == 'true'
-        name: Create local manifest file
-        run: dotnet new tool-manifest
-      - if: steps.changed-logic.outputs.changed == 'true'
-        name: Install analyzer
-        run: dotnet tool install SemVerAnalyzer
-
-      - if: steps.changed-logic.outputs.changed == 'true'
-        name: Analyze logic
-        id: analyze-logic
-        # multiline comment support details: https://github.community/t/set-output-truncates-multiline-strings/16852/3
-        run: |
-          dotnet analyze-semver -a artifacts/DLLs/JsonLogic/bin/Release/netstandard2.1/JsonLogic.dll -o semver-report-logic.md -c .github/semver_config.json
-          unset HAS_REPORT
-          unset REPORT
-          if [ -s semver-report-logic.md ]
-          then
-            HAS_REPORT='true'
-            REPORT=$(<semver-report-logic.md)
-            REPORT="${REPORT//'%'/'%25'}"
-            REPORT="${REPORT//$'\n'/'%0A'}"
-            REPORT="${REPORT//$'\r'/'%0D'}"
-            echo "::set-output name=REPORT::${REPORT}"
-          fi
-          echo ::set-output name=HAS_REPORT::${HAS_REPORT}
-
-        # Report
-      - if: steps.analyze-logic.outputs.HAS_REPORT
-        uses: unsplash/comment-on-pr@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          msg: |
-            ${{ steps.analyze-logic.outputs.REPORT }}
+          auth: ${{ secrets.TEST_BADGE_KEY }}
+          gistID: 28607f2d276032f4d9a7f2c807e44df7
+          filename: test-results-badge.json
+          label: tests
+          message: ${{ format('{0} passing | {1} failing', env.PASS_COUNT, env.FAIL_COUNT) }}
+          color: ${{ env.BUILD_STATUS }}

@@ -1,0 +1,33 @@
+﻿using System.Linq;
+
+namespace Json.Schema.DataGeneration.Requirements;
+
+internal class ContainsRequirementsGatherer : IRequirementsGatherer
+{
+	public void AddRequirements(RequirementsContext context, JsonSchema schema, EvaluationOptions options)
+	{
+		var contains = schema.Keywords?.OfType<ContainsKeyword>().FirstOrDefault()?.Schema;
+		if (contains != null)
+		{
+			if (context.Contains != null)
+				context.Contains.And(contains.GetRequirements(options));
+			else
+				context.Contains = contains.GetRequirements(options);
+		}
+
+		var range = NumberRangeSet.Full;
+		var minimum = schema.Keywords?.OfType<MinContainsKeyword>().FirstOrDefault()?.Value;
+		if (minimum != null)
+			range = range.Floor(minimum.Value);
+		var maximum = schema.Keywords?.OfType<MaxContainsKeyword>().FirstOrDefault()?.Value;
+		if (maximum != null)
+			range = range.Ceiling(maximum.Value);
+		if (range != NumberRangeSet.Full)
+		{
+			if (context.ContainsCounts != null)
+				context.ContainsCounts *= range;
+			else
+				context.ContainsCounts = range;
+		}
+	}
+}

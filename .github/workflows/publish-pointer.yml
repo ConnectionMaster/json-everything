@@ -5,30 +5,36 @@ on:
     branches:
       - master # Default release branch
     paths:
-      - JsonPointer/**
+      - .github/workflows/publish-pointer.yml
+      - src/JsonPointer/**
   workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
 
 jobs:
   publish:
     name: build, pack & publish
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v2
         with:
-          dotnet-version: 5.0.100
+          dotnet-version: 9.0.x
       # Publish
       - name: publish pointer
         id: publish_pointer
-        uses: rohith/publish-nuget@v2
+        uses: alirezanet/publish-nuget@v3.1.0
         with:
-          PROJECT_FILE_PATH: JsonPointer/JsonPointer.csproj
+          PROJECT_FILE_PATH: src/JsonPointer/JsonPointer.csproj
           NUGET_KEY: ${{secrets.NUGET_API_KEY}}
           INCLUDE_SYMBOLS: true
           TAG_FORMAT: pointer-v*
+          PACKAGE_NAME: JsonPointer.Net
       - name: archive packages
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: archive-packages
           path: |

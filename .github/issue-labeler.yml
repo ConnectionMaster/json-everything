@@ -1,0 +1,50 @@
+"pkg:more":
+  - '### Nuget Package\s*Json\.More\.Net'
+
+"pkg:schema":
+  - '### Nuget Package\s*JsonSchema\.Net\s'
+
+"pkg:schema-generation":
+  - '### Nuget Package\s*JsonSchema\.Net\.Generation'
+
+"pkg:schema-generation-dataannotations":
+  - '### Nuget Package\s*JsonSchema\.Net\.Generation\.DataAnnotations'
+
+"pkg:schema-datagen":
+  - '### Nuget Package\s*JsonSchema\.Net\.DataGeneration'
+
+"pkg:schema-codegen":
+  - '### Nuget Package\s*JsonSchema\.Net\.CodeGeneration'
+
+"pkg:schema-data":
+  - '### Nuget Package\s*JsonSchema\.Net\.Data\s'
+
+"pkg:schema-openapi":
+  - '### Nuget Package\s*JsonSchema\.Net\.OpenApi'
+
+"pkg:schema-unique-keys":
+  - '### Nuget Package\s*JsonSchema\.Net\.UniqueKeys'
+
+"pkg:schema-array-ext":
+  - '### Nuget Package\s*JsonSchema\.Net\.ArrayExt'
+
+"pkg:logic":
+  - '### Nuget Package\s*JsonLogic'
+
+"pkg:pointer":
+  - '### Nuget Package\s*JsonPointer\.Net'
+
+"pkg:path":
+  - '### Nuget Package\s*JsonPath\.Net'
+
+"pkg:patch":
+  - '### Nuget Package\s*JsonPatch\.Net'
+
+"pkg:json-e":
+  - '### Nuget Package\s*JsonE.Net'
+
+"pkg:yaml":
+  - '### Nuget Package\s*Yaml2JsonNode'
+
+"json-everything.net":
+  - '### Nuget Package\s*json-everything.net \(playground\)'

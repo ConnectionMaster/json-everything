@@ -1,0 +1,596 @@
+﻿@page "/json-schema"
+@using Json.Schema.DataGeneration
+@using Json.Schema
+@using System.Text.Json
+@using Json.Schema.Data
+@using Json.Schema.Generation
+@using JsonEverythingNet.Services
+@using EditorOptions = JsonEverythingNet.Services.EditorOptions
+@using System.Text.Encodings.Web
+@using Microsoft.CodeAnalysis
+@using Microsoft.CodeAnalysis.CSharp
+@using System.Reflection
+@using System.Text.Json.Nodes
+@using BlazorMonaco.Editor
+@using Json.Schema.ArrayExt
+@using Json.Schema.Generation.XmlComments
+@using Json.Schema.OpenApi
+@using Yaml2JsonNode
+
+@inject DataManager DataManager;
+@inject NavigationManager NavigationManager;
+@inject IJSRuntime JsRuntime;
+
+<PageTitle>JSON Schema - json-everything.net</PageTitle>
+
+<div id="layout" class="flex-grow-1 position-relative">
+	<div class="dimgray fill-remaining">
+		<div class="inner d-flex h-100">
+			<div class="green w-25 d-flex">
+				<div class="tan grid-panel flex-grow-1 scroll">
+					<div class="align-items-center hstack mx-2">
+						<img src="img/json-schema.png" height="70" width="70" class="me-3" />
+						<h1 class="display-4">JSON Schema</h1>
+					</div>
+					<div class="align-items-center mx-3">
+						<div>
+							Constraints-based validation of JSON data. Learn more about
+							<a href="https://json-schema.org" target="_blank">JSON Schema <ExternalLinkIcon /></a>
+						</div>
+					</div>
+					<div class="align-items-center mt-1">
+						@foreach (var library in _libraries)
+						{
+							<NugetLibrary Library="@library" />
+						}
+					</div>
+					<hr />
+					<EditForm Model="_options" class="vstack">
+						<label class="my-2">
+							What do you want to do?<br />
+							<InputSelect @bind-Value="Operation" DisplayName="Spec version" class="form-control">
+								@foreach (SchemaOperations operation in Enum.GetValues(typeof(SchemaOperations)))
+								{
+									<option value="@operation">@GetDescription(operation)</option>
+								}
+							</InputSelect>
+						</label>
+						<div class="vstack @EvaluationOptionsVisibility">
+							<label class="my-2">
+								Spec Version (<span class="small"><span class="font-monospace">$schema</span> will override</span>)
+								<span class="tooltip-icon">
+									ⓘ
+									<span class="tooltip-text">
+										<MarkdownSpan Content="@HelpContent.SchemaVersion"></MarkdownSpan>
+									</span>
+								</span>
+								<br />
+								<InputSelect @bind-Value="_options.Version" DisplayName="Spec version" class="form-control">
+									@foreach (SpecVersion version in Enum.GetValues(typeof(SpecVersion)))
+									{
+										if (version is SpecVersion.Unspecified or SpecVersion.All) continue;
+										<option value="@version">@GetDescription(version)</option>
+									}
+								</InputSelect>
+							</label>
+							<label class="my-2">
+								Output format
+								<span class="tooltip-icon">
+									ⓘ
+									<span class="tooltip-text">
+										<MarkdownSpan Content="@HelpContent.SchemaOutputFormat"></MarkdownSpan>
+									</span>
+								</span>
+								<br />
+								<InputSelect @bind-Value="_options.OutputFormat" DisplayName="Output format" class="form-control">
+									@foreach (var format in Enum.GetValues(typeof(OutputFormat)))
+									{
+										<option value="@format">@format</option>
+									}
+								</InputSelect>
+							</label>
+							<label class="my-2">
+								<InputCheckbox @bind-Value="_options.IncludeDroppedAnnotations" DisplayName="Preserve dropped annotations" />
+								Preserve dropped annotations
+								<span class="tooltip-icon">
+									ⓘ
+									<span class="tooltip-text">
+										<MarkdownSpan Content="@HelpContent.SchemaDroppedAnnotations"></MarkdownSpan>
+									</span>
+								</span>
+							</label>
+							<label class="my-2">
+								<InputCheckbox @bind-Value="_options.AddAnnotationForUnknownKeywords" DisplayName="Unknown keywords annotation" />
+								Unknown keywords annotation
+								<span class="tooltip-icon">
+									ⓘ
+									<span class="tooltip-text">
+										<MarkdownSpan Content="@HelpContent.SchemaUnknownKeywordsAnnotation"></MarkdownSpan>
+									</span>
+								</span>
+							</label>
+							<label class="my-2">
+								<InputCheckbox @bind-Value="_options.ValidateFormat" DisplayName="Validate format" />
+								Validate <span class="font-monospace">format</span>
+								<span class="tooltip-icon">
+									ⓘ
+									<span class="tooltip-text">
+										<MarkdownSpan Content="@HelpContent.SchemaValidateFormat"></MarkdownSpan>
+									</span>
+								</span>
+							</label>
+						</div>
+						<button class="btn btn-primary mt-2" @onclick="Run">Run</button>
+					</EditForm>
+					<hr />
+					<MarkdownSpan Content="@HelpSummary"></MarkdownSpan>
+				</div>
+			</div>
+			<div class="gray w-75 d-flex flex-wrap">
+				<div class="pink w-50 d-flex flex-grow-1 h-50">
+					<div class="grid-panel flex-grow-1 position-relative">
+						<span class="editor-lang-@_schemaEditorLanguage">@GetLanguageText(_schemaEditorLanguage)</span>
+						<StandaloneCodeEditor @ref="_schemaEditor" Id="editor-schema" ConstructionOptions="BasicOptions"
+						CssClass="h-100" OnDidChangeModelContent="HandleSchemaChanged" />
+					</div>
+				</div>
+				<div class="cyan w-50 d-flex flex-grow-1 h-50">
+					<div class="grid-panel flex-grow-1 position-relative">
+						<span class="editor-lang-@_instanceEditorLanguage">@GetLanguageText(_instanceEditorLanguage)</span>
+						<StandaloneCodeEditor @ref="_instanceEditor" Id="editor-instance" ConstructionOptions="BasicOptions"
+						CssClass="h-100" OnDidChangeModelContent="HandleInstanceChanged" />
+					</div>
+				</div>
+				<div class="yellow w-100 d-flex flex-grow-1 h-50">
+					<div class="grid-panel flex-grow-1">
+						<StandaloneCodeEditor @ref="_outputEditor" Id="editor-output" ConstructionOptions="ReadOnlyOptions"
+						CssClass="h-100 mb-2" />
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+@code {
+	#pragma warning disable CS8618
+	private StandaloneCodeEditor _schemaEditor;
+	private string _schemaEditorLanguage;
+	private StandaloneCodeEditor _instanceEditor;
+	private string _instanceEditorLanguage;
+	private StandaloneCodeEditor _outputEditor;
+
+	private readonly SchemaOptionsModel _options = new();
+
+	private readonly List<LibraryVersion> _libraries =
+	[
+		LibraryVersion.GetFor<JsonSchema>(),
+	LibraryVersion.GetFor<DataKeyword>(),
+	LibraryVersion.GetFor<UniqueKeysKeyword>(),
+	LibraryVersion.GetFor<DiscriminatorKeyword>(),
+	LibraryVersion.GetFor<ISchemaRefiner>(),
+	LibraryVersion.GetFor<Bound>()
+	];
+
+	private IEnumerable<MetadataReference> _references;
+	private SchemaOperations _operation = SchemaOperations.Evaluate;
+
+#pragma warning restore CS8618
+
+	public enum SchemaOperations
+	{
+		Evaluate,
+		GenerateSchema,
+		GenerateData
+	}
+
+	private class SchemaOptionsModel
+	{
+		public OutputFormat OutputFormat { get; set; } = OutputFormat.Hierarchical;
+		public SpecVersion Version { get; set; } = SpecVersion.Draft202012;
+		public bool ValidateFormat { get; set; }
+		public bool IncludeDroppedAnnotations { get; set; }
+		public bool AddAnnotationForUnknownKeywords { get; set; }
+
+		public EvaluationOptions ToValidationOptions() => new()
+		{
+			OutputFormat = OutputFormat,
+			EvaluateAs = Version,
+			RequireFormatValidation = ValidateFormat,
+			PreserveDroppedAnnotations = IncludeDroppedAnnotations,
+			AddAnnotationForUnknownKeywords = AddAnnotationForUnknownKeywords
+		};
+	}
+
+	public SchemaOperations Operation
+	{
+		get => _operation;
+		set
+		{
+			_operation = value;
+
+			switch (value)
+			{
+				case SchemaOperations.GenerateSchema:
+					ConfigureForSchemaGen();
+					break;
+				case SchemaOperations.GenerateData:
+					ConfigureForDataGen();
+					break;
+				case SchemaOperations.Evaluate:
+				default:
+					ConfigureForEvaluation();
+					break;
+			}
+		}
+	}
+
+	private string HelpSummary { get; set; } = HelpContent.SchemaEvaluate;
+	private string SchemaEditorLabel { get; set; } = "Schema (supports JSON & YAML)";
+	private string EvaluationOptionsVisibility { get; set; } = "visible";
+
+	private static StandaloneEditorConstructionOptions BasicOptions(StandaloneCodeEditor _) => EditorOptions.Basic();
+	private static StandaloneEditorConstructionOptions ReadOnlyOptions(StandaloneCodeEditor _) => EditorOptions.Readonly();
+
+	private static string GetLanguageText(string langKey) => langKey switch
+	{
+		"csharp" => "c#",
+		_ => langKey
+	};
+
+	private static string GetDescription(SpecVersion draft) => draft switch
+	{
+		SpecVersion.Unspecified => "Draft 2020-12",
+		SpecVersion.Draft6 => "Draft 6",
+		SpecVersion.Draft7 => "Draft 7",
+		SpecVersion.Draft201909 => "Draft 2019-09",
+		SpecVersion.Draft202012 => "Draft 2020-12",
+		SpecVersion.DraftNext => "Draft-Next (preview)",
+		_ => "Draft 2020-12"
+	};
+
+	private static string GetDescription(SchemaOperations operation) => operation switch
+	{
+		SchemaOperations.Evaluate => "Evaluate JSON",
+		SchemaOperations.GenerateSchema => "Generate a Schema",
+		SchemaOperations.GenerateData => "Generate Data",
+		_ => "Evaluate JSON"
+	};
+
+	private void ConfigureForEvaluation()
+	{
+		_schemaEditor.UpdateOptions(new EditorUpdateOptions { TabSize = 2 });
+		Task.Run(async () =>
+		{
+			_schemaEditorLanguage = await _schemaEditor.DetectLanguage(JsRuntime);
+			await DataManager.Set("schema-input-language", "json");
+		});
+
+		SchemaEditorLabel = "Schema";
+
+		HelpSummary = HelpContent.SchemaEvaluate;
+
+		EvaluationOptionsVisibility = "";
+	}
+
+	private void ConfigureForSchemaGen()
+	{
+		_schemaEditor.SetLanguage("csharp", JsRuntime);
+		_schemaEditorLanguage = "csharp";
+		_schemaEditor.UpdateOptions(new EditorUpdateOptions { TabSize = 4 });
+		Task.Run(() => DataManager.Set("schema-input-language", "csharp"));
+
+		SchemaEditorLabel = "Classes (C#)";
+
+		HelpSummary = HelpContent.SchemaGenerateSchema;
+
+		EvaluationOptionsVisibility = "d-none";
+	}
+
+	private void ConfigureForDataGen()
+	{
+		_schemaEditor.UpdateOptions(new EditorUpdateOptions { TabSize = 2 });
+		Task.Run(async () =>
+		{
+			_schemaEditorLanguage = await _schemaEditor.DetectLanguage(JsRuntime);
+			await DataManager.Set("schema-input-language", "json");
+		});
+
+		SchemaEditorLabel = "Schema";
+
+		HelpSummary = HelpContent.SchemaGenerateData;
+
+		EvaluationOptionsVisibility = "d-none";
+	}
+
+	private async Task Run()
+	{
+		await SaveSchema();
+		await SaveInstance();
+
+		switch (Operation)
+		{
+			case SchemaOperations.Evaluate:
+				await Validate();
+				break;
+			case SchemaOperations.GenerateSchema:
+				await GenerateSchema();
+				break;
+			case SchemaOperations.GenerateData:
+				await GenerateData();
+				break;
+			default:
+				throw new ArgumentOutOfRangeException();
+		}
+	}
+
+	private async Task Validate()
+	{
+		await _outputEditor.SetLanguageAsync("json", JsRuntime);
+		await _outputEditor.SetValue(string.Empty);
+
+		JsonSchema schema;
+		try
+		{
+			var text = await _schemaEditor.GetValue();
+			schema = YamlSerializer.Deserialize<JsonSchema>(text)!;
+		}
+		catch (Exception e)
+		{
+			await _outputEditor.SetLanguageAsync("text", JsRuntime);
+			await _outputEditor.SetValue($"Schema is invalid\n\n{e.Message}");
+			return;
+		}
+		JsonNode? instance;
+		try
+		{
+			instance = YamlSerializer.Parse(await _instanceEditor.GetValue()).Single().ToJsonNode();
+		}
+		catch (Exception e)
+		{
+			await _outputEditor.SetLanguageAsync("text", JsRuntime);
+			await _outputEditor.SetValue($"Instance is invalid\n\n{e.Message}");
+			return;
+		}
+
+		try
+		{
+			var results = schema.Evaluate(instance, _options.ToValidationOptions());
+
+			var serializerOptions = new JsonSerializerOptions
+			{
+				WriteIndented = true,
+				Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+			};
+			var resultText = JsonSerializer.Serialize(results, serializerOptions);
+
+			await _outputEditor.SetValue(resultText);
+		}
+		catch (Exception e)
+		{
+			await _outputEditor.SetLanguageAsync("text", JsRuntime);
+			await _outputEditor.SetValue(e.Message);
+		}
+	}
+
+	private async Task GenerateData()
+	{
+		await _outputEditor.SetLanguageAsync("json", JsRuntime);
+		await _outputEditor.SetValue(string.Empty);
+
+		JsonSchema schema;
+		try
+		{
+			schema = YamlSerializer.Deserialize<JsonSchema>(await _schemaEditor.GetValue())!;
+		}
+		catch (Exception e)
+		{
+			await _outputEditor.SetLanguageAsync("text", JsRuntime);
+			await _outputEditor.SetValue($"Schema is invalid\n\n{e.Message}");
+			return;
+		}
+
+		var generationResults = schema.GenerateData();
+
+		if (generationResults.IsSuccess)
+		{
+			var instance = JsonSerializer.Serialize(generationResults.Result, new JsonSerializerOptions {WriteIndented = true});
+			await _instanceEditor.SetValue(instance);
+			await SaveInstance();
+		}
+		else
+		{
+			await _outputEditor.SetValue(generationResults.ErrorMessage);
+		}
+	}
+
+#pragma warning disable CS0618 // Type or member is obsolete
+	private async Task GenerateSchema()
+	{
+		await _outputEditor.SetLanguageAsync("json", JsRuntime);
+		await _outputEditor.SetValue(string.Empty);
+
+		Assembly? assembly = null;
+		try
+		{
+			var source = await _schemaEditor.GetValue();
+
+			var fullSource = $@"
+using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using Json.Schema;
+using Json.Schema.Generation;
+
+namespace JsonEverythingTemp;
+
+{source}
+";
+
+			var syntaxTree = CSharpSyntaxTree.ParseText(fullSource);
+			var assemblyPath = System.IO.Path.ChangeExtension(System.IO.Path.GetTempFileName(), "dll");
+
+			var compilation = CSharpCompilation.Create(System.IO.Path.GetFileName(assemblyPath))
+				.WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+				.AddReferences(_references)
+				.AddSyntaxTrees(syntaxTree);
+
+			using var dllStream = new MemoryStream();
+			using var pdbStream = new MemoryStream();
+			using var xmlStream = new MemoryStream();
+			var emitResult = compilation.Emit(dllStream, pdbStream, xmlStream);
+			if (!emitResult.Success)
+			{
+				var errors = string.Join("\n", emitResult.Diagnostics
+					.Where(x => x.Severity == DiagnosticSeverity.Error)
+					.Select((x, i) => $"{i+1}. {x.GetMessage()}"));
+				await _outputEditor.SetValue($"Compilation error:\n\n{errors}");
+				return;
+			}
+
+			assembly = Assembly.Load(dllStream.ToArray());
+			var type = assembly.DefinedTypes.First(x => x.Namespace == "JsonEverythingTemp");
+
+			xmlStream.Position = 0;
+			using var reader = new StreamReader(xmlStream);
+			var xmlContent = await reader.ReadToEndAsync();
+			DocXmlReader.ExplicitlyAddAssemblyXml(assembly, xmlContent);
+
+
+			Console.WriteLine($"Generating schema for type '{type.Name}'");
+			JsonSchema schema = new JsonSchemaBuilder().FromType(type);
+
+			await _outputEditor.SetValue(JsonSerializer.Serialize(schema, new JsonSerializerOptions { WriteIndented = true }));
+		}
+		catch (Exception e)
+		{
+			await _outputEditor.SetLanguageAsync("text", JsRuntime);
+			await _outputEditor.SetValue(e.Message);
+		}
+		finally
+		{
+			if (assembly is not null)
+				DocXmlReader.ExplictlyRemoveAssemblyXml(assembly);
+		}
+	}
+#pragma warning restore CS0618 // Type or member is obsolete
+
+	//private static string GetErrorDetails(string source, Diagnostic diagnostic)
+	//{
+	//	Console.WriteLine(JsonSerializer.Serialize(diagnostic, new JsonSerializerOptions { WriteIndented = true }));
+	//	var start = diagnostic.Location.SourceSpan.Start - 115;
+	//	var lineNumber = source[..start].Count(x => x == '\n') + 1;
+	//	var lastNewLine = source[..start].LastIndexOf('\n') - 1;
+	//	var columnNumber = start - lastNewLine;
+
+	//	return $"Compilation error at line {lineNumber}, col {columnNumber}";
+	//	return "Compilation error";
+	//}
+
+	private async Task SaveSchema()
+	{
+		await DataManager.SaveEditorValue(_schemaEditor, "schema");
+	}
+
+	private async Task HandleSchemaChanged()
+	{
+		if (_operation != SchemaOperations.GenerateSchema)
+			_schemaEditorLanguage = await _schemaEditor.DetectLanguage(JsRuntime);
+	}
+
+	private async Task LoadSavedSchema()
+	{
+		await DataManager.LoadEditorValue(_schemaEditor, "schema");
+	}
+
+	private async Task SaveInstance()
+	{
+		await DataManager.SaveEditorValue(_instanceEditor, "schema-instance");
+	}
+
+	private async Task HandleInstanceChanged()
+	{
+		_instanceEditorLanguage = await _instanceEditor.DetectLanguage(JsRuntime);
+	}
+
+	private async Task LoadSavedInstance()
+	{
+		await DataManager.LoadEditorValue(_instanceEditor, "schema-instance");
+	}
+
+	private async Task LoadSavedSettings()
+	{
+		var language = await DataManager.Get("schema-input-language") ?? "json";
+		await _schemaEditor.SetLanguageAsync(language, JsRuntime);
+
+		Operation = language == "json" ? SchemaOperations.Evaluate : SchemaOperations.GenerateSchema;
+		SchemaEditorLabel = language == "json" ? "Classes" : "Schema";
+		HelpSummary = language == "json" ? HelpContent.SchemaEvaluate : HelpContent.SchemaGenerateSchema;
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			Json.Schema.Data.Vocabularies.Register();
+			Json.Schema.ArrayExt.Vocabularies.Register();
+			Json.Schema.OpenApi.Vocabularies.Register();
+			Data2022Support.Vocabularies.Register();
+
+			await LoadSavedSchema();
+			await LoadSavedInstance();
+			await LoadSavedSettings();
+
+			await LoadAssemblyReferences();
+
+			_schemaEditorLanguage = await _schemaEditor.DetectLanguage(JsRuntime);
+			_instanceEditorLanguage = await _instanceEditor.DetectLanguage(JsRuntime);
+
+			await _outputEditor.SetLanguageAsync("json", JsRuntime);
+			await _outputEditor.UpdateOptions(new EditorUpdateOptions { TabSize = 2 });
+			await _outputEditor.SetValue(string.Empty);
+		}
+
+		var t = _schemaEditorLanguage;
+		_schemaEditorLanguage = "json";
+		_schemaEditorLanguage = t;
+
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	private async Task LoadAssemblyReferences()
+	{
+		var domain = AppDomain.CurrentDomain;
+		var refs = domain.GetAssemblies();
+		var client = new HttpClient 
+		{
+			BaseAddress = new Uri(NavigationManager.BaseUri)
+		};
+
+		var references = new List<MetadataReference>();
+
+		var failedToLoadRefs = false;
+		// the generation functions create dynamic libraries.  we don't want those.
+		foreach(var reference in refs.Where(x => !x.IsDynamic))
+		{
+			try
+			{
+				var stream = await client.GetStreamAsync($"_framework/{reference.FullName!.Split(',')[0]}.dll");
+				references.Add(MetadataReference.CreateFromStream(stream));
+				Console.WriteLine(reference.FullName);
+			}
+			catch (Exception e)
+			{
+				Console.Error.WriteLine(e);
+				failedToLoadRefs = true;
+			}
+		}
+
+		if (failedToLoadRefs)
+			throw new DllNotFoundException("Could not load one or more .Net references. Some functions may not be available.");
+
+		_references = references;
+	}
+}
