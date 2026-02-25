@@ -26,8 +26,12 @@ internal class RemoveOperationHandler : IPatchOperationHandler
 
 		var lastPathSegment = operation.Path.GetSegment(operation.Path.SegmentCount - 1).ToString();
 		if (source is JsonObject objSource)
+		{
 			objSource.Remove(lastPathSegment);
-		else if (source is JsonArray arrSource)
+			return;
+		}
+		
+		if (source is JsonArray arrSource)
 		{
 			var index = lastPathSegment.Length != 0 && lastPathSegment[0] == '-'
 				? arrSource.Count - 1
@@ -35,6 +39,9 @@ internal class RemoveOperationHandler : IPatchOperationHandler
 					? i
 					: throw new ArgumentException("Expected integer");
 			arrSource.RemoveAt(index);
+			return;
 		}
+
+		context.Message = $"Target path `{operation.Path}` could not be reached.";
 	}
 }

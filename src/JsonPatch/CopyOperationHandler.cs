@@ -50,6 +50,9 @@ internal class CopyOperationHandler : IPatchOperationHandler
 				arrTarget.Insert(index, data?.DeepClone());
 			else if (index == arrTarget.Count)
 				arrTarget.Add(data?.DeepClone());
+			return;
 		}
+
+		context.Message = $"Target path `{operation.From}` could not be reached.";
 	}
 }

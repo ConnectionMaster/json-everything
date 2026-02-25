@@ -47,6 +47,9 @@ internal class AddOperationHandler : IPatchOperationHandler
 				arrTarget.Add(operation.Value?.DeepClone());
 			else
 				context.Message = "Path indicates an index greater than the bounds of the array";
+			return;
 		}
+
+		context.Message = $"Target path `{operation.Path}` could not be reached.";
 	}
 }
