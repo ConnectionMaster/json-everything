@@ -329,4 +329,22 @@ public class GithubTests
 		Console.WriteLine(copyResult.Result.AsJsonString());
 		Assert.That(copyResult.Result.IsEquivalentTo(expected));
 	}
+
+	[Test]
+	public void Issue1004_AddPropertyToScalarShouldFail()
+	{
+		var jsonModel = new JsonObject
+		{
+			["a"] = "b",
+		};
+
+		var patchDoc = new JsonPatch(
+			PatchOperation.Add(JsonPointer.Parse("/a/b"), "c")
+		);
+
+		var patchResult = patchDoc.Apply(jsonModel);
+
+		Assert.That(patchResult.IsSuccess, Is.False);
+		Assert.That(patchResult.Error, Is.EqualTo("Target path `/a/b` could not be reached."));
+	}
 }
