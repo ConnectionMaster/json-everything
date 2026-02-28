@@ -620,6 +620,7 @@ internal static class SchemaCodeEmitter
 		sb.AppendLine("\t[ModuleInitializer]");
 		sb.AppendLine("\tinternal static void RegisterSchemas()");
 		sb.AppendLine("\t{");
+		sb.AppendLine("#pragma warning disable IL3050");
 
 		foreach (var type in types)
 		{
@@ -630,6 +631,7 @@ internal static class SchemaCodeEmitter
 			sb.AppendLine($"\t\t\t\tValidatingJsonConverter.DefaultOptionsFactory));");
 		}
 
+		sb.AppendLine("#pragma warning restore IL3050");
 		sb.AppendLine("\t}");
 		sb.AppendLine("}");
 	}
