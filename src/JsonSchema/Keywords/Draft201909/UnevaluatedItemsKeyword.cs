@@ -107,7 +107,7 @@ public class UnevaluatedItemsKeyword : IKeywordHandler
 			IsValid = isValid,
 			Details = subschemaEvaluations.ToArray(),
 			Annotation = JsonElementExtensions.True,
-			Error = isValid
+			Error = isValid || !context.Options.IncludeApplicatorErrors
 				? null
 				: ErrorMessages.GetUnevaluatedItems(context.Options.Culture)
 					.ReplaceToken("failed", failedIndexes.ToArray(), JsonSchemaSerializerContext.Default.Int32Array)

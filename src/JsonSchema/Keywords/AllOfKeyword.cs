@@ -108,19 +108,20 @@ public class AllOfKeyword : IKeywordHandler
 			i++;
 		}
 
+		var isValid = subschemaEvaluations.Count == 0 || subschemaEvaluations.All(x => x.IsValid);
 		return new KeywordEvaluation
 		{
 			Keyword = Name,
-			IsValid = subschemaEvaluations.Count == 0 || subschemaEvaluations.All(x => x.IsValid),
+			IsValid = isValid,
 			Details = subschemaEvaluations.ToArray(),
-			Error = subschemaEvaluations.Count != 0 && subschemaEvaluations.Any(x => !x.IsValid)
-				? ErrorMessages.GetAllOf(context.Options.Culture)
+			Error = isValid || !context.Options.IncludeApplicatorErrors
+				? null
+				: ErrorMessages.GetAllOf(context.Options.Culture)
 					.ReplaceToken("failed", subschemaEvaluations
 						.Select((r, idx) => (r, idx))
 						.Where(x => !x.r.IsValid)
 						.Select(x => x.idx)
 						.ToArray(), JsonSchemaSerializerContext.Default.Int32Array)
-				: null
 		};
 	}
 }

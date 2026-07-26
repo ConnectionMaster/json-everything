@@ -134,7 +134,7 @@ public class PatternPropertiesKeyword : IKeywordHandler
 			IsValid = isValid,
 			Details = subschemaEvaluations.ToArray(),
 			Annotation = JsonSerializer.SerializeToElement(propertyNames, JsonSchemaSerializerContext.Default.HashSetString),
-			Error = isValid
+			Error = isValid || !context.Options.IncludeApplicatorErrors
 				? null
 				: ErrorMessages.GetPatternProperties(context.Options.Culture)
 					.ReplaceToken("failed", failedProperties, JsonSchemaSerializerContext.Default.HashSetString)

@@ -79,6 +79,7 @@ public class PropertiesKeyword : IKeywordHandler
 
 		var subschemaEvaluations = new List<EvaluationResults>();
 		var propertyNames = new HashSet<string>();
+		var failedProperties = new HashSet<string>();
 
 		foreach (var subschema in keyword.Subschemas)
 		{
@@ -97,6 +98,8 @@ public class PropertiesKeyword : IKeywordHandler
 
 			var local = subschema.Evaluate(propContext);
 			subschemaEvaluations.Add(local);
+			if (!local.IsValid)
+				failedProperties.Add(propertyName);
 
 			if (context.CanOptimize && !local.IsValid)
 				return new KeywordEvaluation
@@ -113,9 +116,10 @@ public class PropertiesKeyword : IKeywordHandler
 			IsValid = isValid,
 			Details = subschemaEvaluations.ToArray(),
 			Annotation = JsonSerializer.SerializeToElement(propertyNames, JsonSchemaSerializerContext.Default.HashSetString),
-			Error = isValid
+			Error = isValid || !context.Options.IncludeApplicatorErrors
 				? null
 				: ErrorMessages.GetProperties(context.Options.Culture)
+					.ReplaceToken("failed", failedProperties, JsonSchemaSerializerContext.Default.HashSetString)
 		};
 	}
 }

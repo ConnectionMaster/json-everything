@@ -105,7 +105,7 @@ public class OutputTests
 				  "schemaLocation": "https://json-everything.test/schema#",
 				  "instanceLocation": "",
 				  "errors": {
-				    "properties": "Some properties did not match the required schema"
+				    "properties": "Some properties did not match the required schema: [\"fails\"]"
 				  }
 				},
 			    {
@@ -164,7 +164,7 @@ public class OutputTests
 			  "schemaLocation": "https://json-everything.test/schema#",
 			  "instanceLocation": "",
 			  "errors": {
-			    "properties": "Some properties did not match the required schema"
+			    "properties": "Some properties did not match the required schema: [\"fails\"]"
 			  },
 			  "details": [
 			    {
@@ -198,7 +198,7 @@ public class OutputTests
 			  "schemaLocation": "https://json-everything.test/schema#",
 			  "instanceLocation": "",
 			  "errors": {
-			    "properties": "Some properties did not match the required schema"
+			    "properties": "Some properties did not match the required schema: [\"fails\"]"
 			  },
 			  "droppedAnnotations": {
 			    "properties": [
@@ -291,7 +291,7 @@ public class OutputTests
 			  "schemaLocation": "https://json-everything.test/schema#",
 			  "instanceLocation": "",
 			  "errors": {
-			    "properties": "Some properties did not match the required schema"
+			    "properties": "Some properties did not match the required schema: [\"multi\"]"
 			  },
 			  "details": [
 			    {
@@ -357,7 +357,7 @@ public class OutputTests
 			  "schemaLocation": "https://json-everything.test/schema#",
 			  "instanceLocation": "",
 			  "errors": {
-			    "properties": "Some properties did not match the required schema"
+			    "properties": "Some properties did not match the required schema: [\"fails\"]"
 			  },
 			  "details": [
 			    {
@@ -387,7 +387,7 @@ public class OutputTests
 			  "schemaLocation": "https://json-everything.test/schema#",
 			  "instanceLocation": "",
 			  "errors": {
-			    "properties": "Some properties did not match the required schema"
+			    "properties": "Some properties did not match the required schema: [\"fails\"]"
 			  },
 			  "details": [
 			    {
@@ -444,7 +444,7 @@ public class OutputTests
 			  "schemaLocation": "https://json-everything.test/schema#",
 			  "instanceLocation": "",
 			  "errors": {
-			    "properties": "Some properties did not match the required schema"
+			    "properties": "Some properties did not match the required schema: [\"refs\"]"
 			  },
 			  "details": [
 			    {

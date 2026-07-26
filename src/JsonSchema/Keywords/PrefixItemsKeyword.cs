@@ -113,7 +113,7 @@ public class PrefixItemsKeyword : IKeywordHandler
 			IsValid = isValid,
 			Details = subschemaEvaluations.ToArray(),
 			Annotation = (subschemaEvaluations.Count - 1).AsJsonElement(),
-			Error = isValid
+			Error = isValid || !context.Options.IncludeApplicatorErrors
 				? null
 				: ErrorMessages.GetPrefixItems(context.Options.Culture)
 					.ReplaceToken("failed", subschemaEvaluations

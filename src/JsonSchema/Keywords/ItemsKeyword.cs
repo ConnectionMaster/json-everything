@@ -107,7 +107,7 @@ public class ItemsKeyword : IKeywordHandler
 			IsValid = isValid,
 			Details = subschemaEvaluations.ToArray(),
 			Annotation = JsonElementExtensions.True,
-			Error = isValid
+			Error = isValid || !context.Options.IncludeApplicatorErrors
 				? null
 				: ErrorMessages.GetItems(context.Options.Culture)
 					.ReplaceToken("failed", subschemaEvaluations

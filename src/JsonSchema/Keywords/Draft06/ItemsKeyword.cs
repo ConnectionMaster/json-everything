@@ -154,7 +154,7 @@ public class ItemsKeyword : IKeywordHandler
 			IsValid = isValid,
 			Details = subschemaEvaluations.ToArray(),
 			Annotation = annotation,
-			Error = isValid
+			Error = isValid || !context.Options.IncludeApplicatorErrors
 				? null
 				: ErrorMessages.GetItems(context.Options.Culture)
 					.ReplaceToken("failed", subschemaEvaluations.Select((r, i) => (r, i))

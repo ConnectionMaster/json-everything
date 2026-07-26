@@ -71,13 +71,13 @@ public class NotKeyword : IKeywordHandler
 		};
 		var result = subschema.Evaluate(oneOfContext);
 
-		var keywordPassed = !result.IsValid;
+		var isValid = !result.IsValid;
 		return new KeywordEvaluation
 		{
 			Keyword = Name,
-			IsValid = keywordPassed,
+			IsValid = isValid,
 			Details = [result],
-			Error = keywordPassed
+			Error = isValid || !context.Options.IncludeApplicatorErrors
 				? null
 				: ErrorMessages.GetNot(context.Options.Culture)
 		};

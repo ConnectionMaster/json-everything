@@ -83,7 +83,7 @@ public class ThenKeyword : IKeywordHandler
 			Keyword = Name,
 			IsValid = result.IsValid,
 			Details = [result],
-			Error = result.IsValid
+			Error = result.IsValid || !context.Options.IncludeApplicatorErrors
 				? null
 				: ErrorMessages.GetThen(context.Options.Culture)
 		};

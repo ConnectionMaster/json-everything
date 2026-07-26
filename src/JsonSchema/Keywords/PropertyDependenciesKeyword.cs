@@ -99,7 +99,7 @@ public class PropertyDependenciesKeyword : IKeywordHandler
 			Keyword = Name,
 			IsValid = isValid,
 			Details = subschemaEvaluations.ToArray(),
-			Error = isValid
+			Error = isValid || !context.Options.IncludeApplicatorErrors
 				? null
 				: ErrorMessages.GetPropertyDependencies(context.Options.Culture)
 					.ReplaceToken("failed", failedProperties, JsonSchemaSerializerContext.Default.HashSetString)
