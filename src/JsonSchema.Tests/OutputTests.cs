@@ -105,7 +105,7 @@ public class OutputTests
 				  "schemaLocation": "https://json-everything.test/schema#",
 				  "instanceLocation": "",
 				  "errors": {
-				    "properties": "Some properties did not match the required schema"
+				    "properties": "Some properties did not match the required schema: [\"fails\"]"
 				  }
 				},
 			    {
@@ -164,7 +164,7 @@ public class OutputTests
 			  "schemaLocation": "https://json-everything.test/schema#",
 			  "instanceLocation": "",
 			  "errors": {
-			    "properties": "Some properties did not match the required schema"
+			    "properties": "Some properties did not match the required schema: [\"fails\"]"
 			  },
 			  "details": [
 			    {
@@ -198,7 +198,7 @@ public class OutputTests
 			  "schemaLocation": "https://json-everything.test/schema#",
 			  "instanceLocation": "",
 			  "errors": {
-			    "properties": "Some properties did not match the required schema"
+			    "properties": "Some properties did not match the required schema: [\"fails\"]"
 			  },
 			  "droppedAnnotations": {
 			    "properties": [
@@ -291,7 +291,7 @@ public class OutputTests
 			  "schemaLocation": "https://json-everything.test/schema#",
 			  "instanceLocation": "",
 			  "errors": {
-			    "properties": "Some properties did not match the required schema"
+			    "properties": "Some properties did not match the required schema: [\"multi\"]"
 			  },
 			  "details": [
 			    {
@@ -357,7 +357,7 @@ public class OutputTests
 			  "schemaLocation": "https://json-everything.test/schema#",
 			  "instanceLocation": "",
 			  "errors": {
-			    "properties": "Some properties did not match the required schema"
+			    "properties": "Some properties did not match the required schema: [\"fails\"]"
 			  },
 			  "details": [
 			    {
@@ -387,8 +387,35 @@ public class OutputTests
 			  "schemaLocation": "https://json-everything.test/schema#",
 			  "instanceLocation": "",
 			  "errors": {
-			    "properties": "Some properties did not match the required schema"
+			    "properties": "Some properties did not match the required schema: [\"fails\"]"
 			  },
+			  "details": [
+			    {
+			      "valid": false,
+			      "evaluationPath": "/properties/fails",
+			      "schemaLocation": "https://json-everything.test/schema#/properties/fails",
+			      "instanceLocation": "/fails",
+			      "errors": {
+			        "": "All values fail against the false schema"
+			      }
+			    }
+			  ]
+			}
+			""";
+
+		result.AssertInvalid(expected);
+	}
+
+	[Test]
+	public void Hierarchical_Multi_Failure_Minimum_ExcludeApplicators()
+	{
+		var result = Validate("{\"fails\":3}", OutputFormat.Hierarchical, false);
+		var expected = """
+			{
+			  "valid": false,
+			  "evaluationPath": "",
+			  "schemaLocation": "https://json-everything.test/schema#",
+			  "instanceLocation": "",
 			  "details": [
 			    {
 			      "valid": false,
@@ -417,7 +444,7 @@ public class OutputTests
 			  "schemaLocation": "https://json-everything.test/schema#",
 			  "instanceLocation": "",
 			  "errors": {
-			    "properties": "Some properties did not match the required schema"
+			    "properties": "Some properties did not match the required schema: [\"refs\"]"
 			  },
 			  "details": [
 			    {
@@ -444,11 +471,12 @@ public class OutputTests
 		result.AssertInvalid(expected);
 	}
 
-	private static EvaluationResults Validate(string json, OutputFormat format)
+	private static EvaluationResults Validate(string json, OutputFormat format, bool includeApplicatorErrors = true)
 	{
 		var instance = JsonDocument.Parse(json).RootElement;
 		var options = EvaluationOptions.From(EvaluationOptions.Default);
 		options.OutputFormat = format;
+		options.IncludeApplicatorErrors = includeApplicatorErrors;
 
 		var result = _schema.Evaluate(instance, options);
 		return result;

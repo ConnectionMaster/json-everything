@@ -689,7 +689,7 @@ public static partial class ErrorMessages
 	/// <param name="culture">The culture to retrieve.</param>
 	/// <remarks>
 	///	Available tokens are:
-	///   - [[failed]] - the indexes of the prefix items that did not match the schema
+	///   - [[failed]] - the indexes of the items that did not match the schema
 	/// </remarks>
 	public static string GetPrefixItems(CultureInfo? culture)
 	{
@@ -706,7 +706,10 @@ public static partial class ErrorMessages
 	/// Gets the error message for <see cref="PropertiesKeyword"/> for a specific culture.
 	/// </summary>
 	/// <param name="culture">The culture to retrieve.</param>
-	/// <remarks>No tokens are supported.</remarks>
+	/// <remarks>
+	///	Available tokens are:
+	///   - [[failed]] - the names of the properties that did not match the associated schema
+	/// </remarks>
 	public static string GetProperties(CultureInfo? culture)
 	{
 		return Properties ?? Get(culture);

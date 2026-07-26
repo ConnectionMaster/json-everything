@@ -83,7 +83,7 @@ public class ElseKeyword : IKeywordHandler
 			Keyword = Name,
 			IsValid = result.IsValid,
 			Details = [result],
-			Error = result.IsValid
+			Error = result.IsValid || !context.Options.IncludeApplicatorErrors
 				? null
 				: ErrorMessages.GetElse(context.Options.Culture)
 		};

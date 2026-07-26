@@ -124,4 +124,31 @@ public class FormatTests
 		TestConsole.WriteLine(JsonSerializer.Serialize(results, TestEnvironment.TestOutputSerializerOptions));
 		Assert.That(results.IsValid, Is.EqualTo(isValid));
 	}
+
+	// Regression tests for RFC 3986 syntactic-only URI validation (issue #1043)
+	// file://../../path has authority=".." (valid reg-name) and path="/../path" — syntactically valid
+	[TestCase("\"file://../../oblx-service-template\"", true)]
+	// Absolute URIs require a scheme
+	[TestCase("\"//foo.bar/?baz=qux#quux\"", false)]
+	[TestCase("\"/abc\"", false)]
+	// Non-numeric port is a structural violation
+	[TestCase("\"http://example.com:abc/path\"", false)]
+	// Non-ASCII must be percent-encoded in URIs
+	[TestCase("\"https://example.org/foobar\\u00AE.txt\"", false)]
+	// IPv4-looking hosts that fail strict parsing are still valid as reg-names
+	[TestCase("\"http://999.999.999.999/\"", true)]
+	[TestCase("\"http://087.10.0.1/\"", true)]
+	public void UriFormatSyntacticValidation(string jsonText, bool isValid)
+	{
+		var json = JsonDocument.Parse(jsonText).RootElement;
+		JsonSchema schema = new JsonSchemaBuilder().Format("uri");
+
+		var results = schema.Evaluate(json, new EvaluationOptions
+		{
+			OutputFormat = OutputFormat.Hierarchical,
+			RequireFormatValidation = true
+		});
+
+		Assert.That(results.IsValid, Is.EqualTo(isValid));
+	}
 }

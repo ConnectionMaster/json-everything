@@ -145,116 +145,318 @@ public static partial class Formats
 		return new UnknownFormat(name);
 	}
 
-	private static bool IsHexChar(char ch)
-	{
-		return ('0' <= ch && ch <= '9') ||
-		       ('A' <= ch && ch <= 'F') ||
-		       ('a' <= ch && ch <= 'f');
-	}
-
-	private static bool HasValidPercentEncodedPairs(string value)
-	{
-		for (int i = 0; i < value.Length; i++)
-		{
-			if (value[i] != '%') continue;
-
-			if (i + 2 >= value.Length) return false;
-			if (!IsHexChar(value[i + 1]) || !IsHexChar(value[i + 2])) return false;
-		}
-
-		return true;
-	}
-
 	private static bool CheckAbsoluteIri(JsonElement node)
 	{
 		if (node.GetSchemaValueType() != SchemaValueType.String) return true;
-
 		var value = node.GetString()!;
-
-		foreach (var ch in value)
-		{
-			if (!IsValidForIri(ch)) return false;
-		}
-
-		if (!System.Uri.TryCreate(value, UriKind.Absolute, out var uri))
-			return false;
-
-		// Must have a proper scheme (reject UNC paths)
-		return !string.IsNullOrEmpty(uri.Scheme) && value.IndexOf(':') > 0;
+		int i = 0;
+		return TryParseUriOrIriRfc(value, ref i, isIri: true) && i == value.Length;
 	}
 
 	private static bool CheckAbsoluteUri(JsonElement node)
 	{
 		if (node.GetSchemaValueType() != SchemaValueType.String) return true;
-
 		var value = node.GetString()!;
-		if (!HasValidPercentEncodedPairs(value)) return false;
-
-		foreach (var ch in value)
-		{
-			if (!IsValidForIri(ch)) return false;
-
-			// URI must be ASCII-only (non-ASCII must be percent-encoded)
-			if (ch > 127) return false;
-		}
-
-		// Check for invalid [ or ] in userinfo (before @)
-		var atIndex = value.IndexOf('@');
-		if (atIndex > 0)
-		{
-			var schemeEnd = value.IndexOf("://");
-			if (schemeEnd >= 0)
-			{
-				var userinfo = value.Substring(schemeEnd + 3, atIndex - schemeEnd - 3);
-				if (userinfo.IndexOf('[') >= 0 || userinfo.IndexOf(']') >= 0)
-					return false;
-			}
-		}
-		
-		if (!System.Uri.TryCreate(value, UriKind.Absolute, out var uri))
-			return false;
-
-		// Must have a proper scheme (reject UNC paths)
-		return !string.IsNullOrEmpty(uri.Scheme) && value.IndexOf(':') > 0;
+		int i = 0;
+		return TryParseUriOrIriRfc(value, ref i, isIri: false) && i == value.Length;
 	}
 
 	private static bool CheckIriReference(JsonElement node)
 	{
 		if (node.GetSchemaValueType() != SchemaValueType.String) return true;
-
-		var value = node.GetString()!;
-
-		foreach (var ch in value)
-		{
-			if (!IsValidForIri(ch)) return false;
-		}
-
-		return System.Uri.TryCreate(value, UriKind.RelativeOrAbsolute, out _);
+		return TryParseUriOrIriReferenceRfc(node.GetString()!, isIri: true);
 	}
 
 	private static bool CheckUri(JsonElement node)
 	{
 		if (node.GetSchemaValueType() != SchemaValueType.String) return true;
-
-		var value = node.GetString()!;
-		if (!HasValidPercentEncodedPairs(value)) return false;
-
-		foreach (var ch in value)
-		{
-			if (!IsValidForIri(ch)) return false;
-
-			// URI-reference must be ASCII-only (non-ASCII must be percent-encoded)
-			if (ch > 127) return false;
-		}
-
-		return System.Uri.TryCreate(value, UriKind.RelativeOrAbsolute, out _);
+		return TryParseUriOrIriReferenceRfc(node.GetString()!, isIri: false);
 	}
 
-	// Reject invalid characters per RFC3987 (IRI)
-	// Must not contain: backslash, space, <, >, {, }, |, ^, `, "
-	private static bool IsValidForIri(char ch)
+	// RFC 3986/3987 character classification helpers
+	private static bool IsAlphaChar(char c) => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+	private static bool IsDigitChar(char c) => c >= '0' && c <= '9';
+	private static bool IsHexDigitChar(char c) => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+	private static bool IsUnreservedChar(char c) => IsAlphaChar(c) || IsDigitChar(c) || c == '-' || c == '.' || c == '_' || c == '~';
+	private static bool IsSubDelimChar(char c) => c is '!' or '$' or '&' or '\'' or '(' or ')' or '*' or '+' or ',' or ';' or '=';
+
+	// ucschar (RFC 3987) — BMP ranges; non-BMP handled via surrogate pairs in ConsumeSegmentRfc
+	private static bool IsUcscharBmp(char c)
+		=> (c >= '\xA0' && c <= '\uD7FF') ||
+		   (c >= '\uF900' && c <= '\uFDCF') ||
+		   (c >= '\uFDD0' && c <= '\uFDEF') ||
+		   (c >= '\uFFF0' && c <= '\uFFFD');
+
+	// iprivate BMP range (RFC 3987): %xE000-F8FF
+	private static bool IsIprivateBmp(char c) => c >= '\uE000' && c <= '\uF8FF';
+
+	// URI / IRI = scheme ":" hier-part [ "?" query ] [ "#" fragment ]
+	private static bool TryParseUriOrIriRfc(string s, ref int i, bool isIri)
 	{
-		return ch is not ('\\' or ' ' or '<' or '>' or '{' or '}' or '|' or '^' or '`' or '"');
+		if (!TryParseSchemeRfc(s, ref i)) return false;
+		if (i >= s.Length || s[i] != ':') return false;
+		i++;
+		if (!TryParseHierPartRfc(s, ref i, isIri)) return false;
+		if (i < s.Length && s[i] == '?') { i++; ConsumeQueryOrFragmentRfc(s, ref i, isIri, isQuery: true); }
+		if (i < s.Length && s[i] == '#') { i++; ConsumeQueryOrFragmentRfc(s, ref i, isIri, isQuery: false); }
+		return true;
+	}
+
+	// URI-reference / IRI-reference = URI / relative-ref
+	private static bool TryParseUriOrIriReferenceRfc(string s, bool isIri)
+	{
+		int i = 0;
+		if (TryParseUriOrIriRfc(s, ref i, isIri) && i == s.Length) return true;
+		i = 0;
+		if (!TryParseRelativePartRfc(s, ref i, isIri)) return false;
+		if (i < s.Length && s[i] == '?') { i++; ConsumeQueryOrFragmentRfc(s, ref i, isIri, isQuery: true); }
+		if (i < s.Length && s[i] == '#') { i++; ConsumeQueryOrFragmentRfc(s, ref i, isIri, isQuery: false); }
+		return i == s.Length;
+	}
+
+	// scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
+	private static bool TryParseSchemeRfc(string s, ref int i)
+	{
+		if (i >= s.Length || !IsAlphaChar(s[i])) return false;
+		i++;
+		while (i < s.Length && (IsAlphaChar(s[i]) || IsDigitChar(s[i]) || s[i] == '+' || s[i] == '-' || s[i] == '.'))
+			i++;
+		return true;
+	}
+
+	// hier-part = "//" authority path-abempty / path-absolute / path-rootless / path-empty
+	private static bool TryParseHierPartRfc(string s, ref int i, bool isIri)
+	{
+		if (i + 1 < s.Length && s[i] == '/' && s[i + 1] == '/')
+		{
+			i += 2;
+			if (!TryParseAuthorityRfc(s, ref i, isIri)) return false;
+			return TryParsePathAbemptyRfc(s, ref i, isIri);
+		}
+		if (i < s.Length && s[i] == '/') return TryParsePathAbsoluteRfc(s, ref i, isIri);
+		return TryParsePathRootlessOrEmptyRfc(s, ref i, isIri);
+	}
+
+	// relative-part = "//" authority path-abempty / path-absolute / path-noscheme / path-empty
+	private static bool TryParseRelativePartRfc(string s, ref int i, bool isIri)
+	{
+		if (i + 1 < s.Length && s[i] == '/' && s[i + 1] == '/')
+		{
+			i += 2;
+			if (!TryParseAuthorityRfc(s, ref i, isIri)) return false;
+			return TryParsePathAbemptyRfc(s, ref i, isIri);
+		}
+		if (i < s.Length && s[i] == '/') return TryParsePathAbsoluteRfc(s, ref i, isIri);
+		return TryParsePathNoschemeOrEmptyRfc(s, ref i, isIri);
+	}
+
+	// authority = [ userinfo "@" ] host [ ":" port ]
+	private static bool TryParseAuthorityRfc(string s, ref int i, bool isIri)
+	{
+		int authorityStart = i;
+		while (i < s.Length && s[i] != '/' && s[i] != '?' && s[i] != '#') i++;
+		int authorityEnd = i;
+
+		// Locate the first "@" to split userinfo from host
+		int atPos = -1;
+		for (int j = authorityStart; j < authorityEnd; j++)
+		{
+			if (s[j] == '@') { atPos = j; break; }
+		}
+
+		int hostStart = authorityStart;
+		if (atPos >= 0)
+		{
+			// Validate userinfo: *( unreserved / pct-encoded / sub-delims / ":" )
+			int k = authorityStart;
+			while (k < atPos)
+			{
+				char c = s[k];
+				if (IsUnreservedChar(c) || IsSubDelimChar(c) || c == ':') { k++; continue; }
+				if (c == '%')
+				{
+					if (k + 2 < atPos && IsHexDigitChar(s[k + 1]) && IsHexDigitChar(s[k + 2])) { k += 3; continue; }
+					return false;
+				}
+				if (isIri && IsUcscharBmp(c)) { k++; continue; }
+				if (isIri && char.IsHighSurrogate(c) && k + 1 < atPos && char.IsLowSurrogate(s[k + 1])) { k += 2; continue; }
+				return false;
+			}
+			hostStart = atPos + 1;
+		}
+
+		// Find port separator; IP-literals "[...]" may contain ":" internally
+		int portColon = -1;
+		if (hostStart < authorityEnd && s[hostStart] == '[')
+		{
+			int closeBracket = -1;
+			for (int j = hostStart + 1; j < authorityEnd; j++)
+			{
+				if (s[j] == ']') { closeBracket = j; break; }
+			}
+			if (closeBracket < 0) return false;
+			int afterBracket = closeBracket + 1;
+			if (afterBracket < authorityEnd)
+			{
+				if (s[afterBracket] == ':') portColon = afterBracket;
+				else return false;
+			}
+		}
+		else
+		{
+			for (int j = hostStart; j < authorityEnd; j++)
+			{
+				if (s[j] == ':') { portColon = j; break; }
+			}
+		}
+
+		int hostEnd = portColon >= 0 ? portColon : authorityEnd;
+		if (!TryParseHostRfc(s, hostStart, hostEnd, isIri)) return false;
+
+		// port = *DIGIT
+		if (portColon >= 0)
+		{
+			for (int j = portColon + 1; j < authorityEnd; j++)
+			{
+				if (!IsDigitChar(s[j])) return false;
+			}
+		}
+
+		return true;
+	}
+
+	// host = IP-literal / reg-name  (IPv4address is syntactically a subset of reg-name)
+	private static bool TryParseHostRfc(string s, int start, int end, bool isIri)
+	{
+		if (start == end) return true; // empty host is valid
+
+		if (s[start] == '[')
+		{
+			// IP-literal = "[" ( IPv6address / IPvFuture ) "]"
+			if (s[end - 1] != ']') return false;
+			var inner = s.Substring(start + 1, end - start - 2);
+			if (inner.Length == 0) return false;
+			if (inner[0] == 'v' || inner[0] == 'V') return TryParseIPvFutureRfc(inner);
+			return System.Net.IPAddress.TryParse(inner, out var addr) &&
+			       addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6;
+		}
+
+		// reg-name = *( unreserved / pct-encoded / sub-delims )
+		for (int i = start; i < end;)
+		{
+			char c = s[i];
+			if (IsUnreservedChar(c) || IsSubDelimChar(c)) { i++; continue; }
+			if (c == '%')
+			{
+				if (i + 2 < end && IsHexDigitChar(s[i + 1]) && IsHexDigitChar(s[i + 2])) { i += 3; continue; }
+				return false;
+			}
+			if (isIri && IsUcscharBmp(c)) { i++; continue; }
+			if (isIri && char.IsHighSurrogate(c) && i + 1 < end && char.IsLowSurrogate(s[i + 1])) { i += 2; continue; }
+			return false;
+		}
+		return true;
+	}
+
+	// IPvFuture = "v" 1*HEXDIG "." 1*( unreserved / sub-delims / ":" )
+	private static bool TryParseIPvFutureRfc(string s)
+	{
+		int i = 1; // s[0] is 'v'/'V'
+		if (i >= s.Length || !IsHexDigitChar(s[i])) return false;
+		while (i < s.Length && IsHexDigitChar(s[i])) i++;
+		if (i >= s.Length || s[i] != '.') return false;
+		i++;
+		if (i >= s.Length) return false;
+		while (i < s.Length)
+		{
+			char c = s[i];
+			if (IsUnreservedChar(c) || IsSubDelimChar(c) || c == ':') { i++; continue; }
+			return false;
+		}
+		return true;
+	}
+
+	// path-abempty = *( "/" segment )
+	private static bool TryParsePathAbemptyRfc(string s, ref int i, bool isIri)
+	{
+		while (i < s.Length && s[i] == '/')
+		{
+			i++;
+			ConsumeSegmentRfc(s, ref i, isIri);
+		}
+		return true;
+	}
+
+	// path-absolute = "/" [ segment-nz *( "/" segment ) ]
+	private static bool TryParsePathAbsoluteRfc(string s, ref int i, bool isIri)
+	{
+		i++; // consume leading '/'
+		if (i < s.Length && s[i] != '/' && s[i] != '?' && s[i] != '#')
+		{
+			int before = i;
+			ConsumeSegmentRfc(s, ref i, isIri);
+			if (i == before) return false; // segment-nz needs at least one pchar
+			TryParsePathAbemptyRfc(s, ref i, isIri);
+		}
+		return true;
+	}
+
+	// path-rootless = segment-nz *( "/" segment )  or  path-empty
+	private static bool TryParsePathRootlessOrEmptyRfc(string s, ref int i, bool isIri)
+	{
+		if (i >= s.Length || s[i] == '?' || s[i] == '#') return true;
+		int before = i;
+		ConsumeSegmentRfc(s, ref i, isIri);
+		if (i == before) return false;
+		TryParsePathAbemptyRfc(s, ref i, isIri);
+		return true;
+	}
+
+	// path-noscheme = segment-nz-nc *( "/" segment )  or  path-empty
+	// segment-nz-nc: 1*( unreserved / pct-encoded / sub-delims / "@" ) — no ":"
+	private static bool TryParsePathNoschemeOrEmptyRfc(string s, ref int i, bool isIri)
+	{
+		if (i >= s.Length || s[i] == '?' || s[i] == '#') return true;
+		int before = i;
+		ConsumeSegmentRfc(s, ref i, isIri, allowColon: false);
+		if (i == before) return false;
+		TryParsePathAbemptyRfc(s, ref i, isIri);
+		return true;
+	}
+
+	// segment = *pchar;  pchar = unreserved / pct-encoded / sub-delims / ":" / "@"
+	private static void ConsumeSegmentRfc(string s, ref int i, bool isIri, bool allowColon = true)
+	{
+		while (i < s.Length)
+		{
+			char c = s[i];
+			if (IsUnreservedChar(c) || IsSubDelimChar(c) || c == '@') { i++; continue; }
+			if (allowColon && c == ':') { i++; continue; }
+			if (c == '%')
+			{
+				if (i + 2 < s.Length && IsHexDigitChar(s[i + 1]) && IsHexDigitChar(s[i + 2])) { i += 3; continue; }
+				break;
+			}
+			if (isIri && IsUcscharBmp(c)) { i++; continue; }
+			if (isIri && char.IsHighSurrogate(c) && i + 1 < s.Length && char.IsLowSurrogate(s[i + 1])) { i += 2; continue; }
+			break;
+		}
+	}
+
+	// query = *( pchar / "/" / "?" )  ;  fragment = *( pchar / "/" / "?" )
+	// For IRI query, iprivate characters are also allowed.
+	private static void ConsumeQueryOrFragmentRfc(string s, ref int i, bool isIri, bool isQuery)
+	{
+		while (i < s.Length)
+		{
+			char c = s[i];
+			if (c == '/' || c == '?') { i++; continue; }
+			if (isQuery && isIri && IsIprivateBmp(c)) { i++; continue; }
+			if (isQuery && isIri && char.IsHighSurrogate(c) && i + 1 < s.Length && char.IsLowSurrogate(s[i + 1])) { i += 2; continue; }
+			int prev = i;
+			ConsumeSegmentRfc(s, ref i, isIri);
+			if (i == prev) break;
+		}
 	}
 
 	private static bool CheckUriTemplate(JsonElement node)

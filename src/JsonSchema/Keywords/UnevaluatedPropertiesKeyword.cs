@@ -110,7 +110,7 @@ public class UnevaluatedPropertiesKeyword : IKeywordHandler
 			IsValid = isValid,
 			Details = subschemaEvaluations.ToArray(),
 			Annotation = JsonElementExtensions.True,
-			Error = isValid
+			Error = isValid || !context.Options.IncludeApplicatorErrors
 				? null
 				: ErrorMessages.GetUnevaluatedProperties(context.Options.Culture)
 					.ReplaceToken("failed", failedProperties, JsonSchemaSerializerContext.Default.HashSetString)

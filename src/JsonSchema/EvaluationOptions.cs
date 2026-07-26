@@ -60,6 +60,12 @@ public class EvaluationOptions
 	public CultureInfo? Culture { get; set; }
 
 	/// <summary>
+	/// Gets or sets whether applicators such as `properties` produce error messages.
+	/// Default is `true`.
+	/// </summary>
+	public bool IncludeApplicatorErrors { get; set; } = true;
+
+	/// <summary>
 	/// Creates a deep copy of the options.
 	/// </summary>
 	/// <param name="other">The source options.</param>
@@ -76,6 +82,7 @@ public class EvaluationOptions
 			_ignoredAnnotationTypes = other._ignoredAnnotationTypes == null
 				? null
 				: new(other._ignoredAnnotationTypes),
+			IncludeApplicatorErrors = other.IncludeApplicatorErrors
 		};
 		return options;
 	}

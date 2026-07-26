@@ -118,7 +118,7 @@ public class OneOfKeyword : IKeywordHandler
 			Keyword = Name,
 			IsValid = isValid,
 			Details = subschemaEvaluations.ToArray(),
-			Error = isValid
+			Error = isValid || !context.Options.IncludeApplicatorErrors
 				? null
 				: ErrorMessages.GetOneOf(context.Options.Culture)
 					.ReplaceToken("count", matchCount)
