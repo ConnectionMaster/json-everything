@@ -50,6 +50,7 @@ public class RelativeJsonPointerParseTests
 			yield return new TestCaseData("/end");
 			yield return new TestCaseData("-1/end");
 			yield return new TestCaseData("end");
+			yield return new TestCaseData("١/foo");
 		}
 	}
 

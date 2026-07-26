@@ -191,7 +191,11 @@ public readonly struct RelativeJsonPointer : IEquatable<RelativeJsonPointer>
 			return false;
 		}
 
-		var parentSteps = span[..i].AsUint();
+		if (! span[..i].TryAsUint(out var parentSteps))
+		{
+			relativePointer = default;
+			return false;
+		}
 
 		if (i == span.Length)
 		{
@@ -207,7 +211,13 @@ public readonly struct RelativeJsonPointer : IEquatable<RelativeJsonPointer>
 			var start = i;
 			while (i < span.Length && char.IsDigit(span[i])) i++;
 
-			indexManipulation = sign * span[start..i].AsInt();
+			if (!span[start..i].TryAsInt(out var index))
+			{
+				relativePointer = default;
+				return false;
+			}
+
+			indexManipulation = sign * index;
 
 			if (i == span.Length)
 			{
