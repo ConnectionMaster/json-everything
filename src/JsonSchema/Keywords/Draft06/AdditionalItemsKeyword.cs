@@ -104,7 +104,7 @@ public class AdditionalItemsKeyword : IKeywordHandler
 			Annotation = JsonElementExtensions.True,
 			Error = isValid || !context.Options.IncludeApplicatorErrors
 				? null
-				: ErrorMessages.GetAdditionalItems(context.Options.Culture)
+				: ErrorMessages.GetItems(context.Options.Culture)
 					.ReplaceToken("failed", subschemaEvaluations
 						.Select((r, idx) => (r, idx))
 						.Where(x => !x.r.IsValid)
