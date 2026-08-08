@@ -54,6 +54,30 @@ public class JsonPointerSegmentTests
     }
 
     [Test]
+    public void SegmentToString_DecodesEncodedSlash()
+    {
+        var pointer = JsonPointer.Parse("/foo~1bar");
+
+        Assert.That(pointer[0].ToString(), Is.EqualTo("foo/bar"));
+    }
+
+    [Test]
+    public void SegmentToString_DecodesEncodedTilde()
+    {
+        var pointer = JsonPointer.Parse("/foo~0bar");
+
+        Assert.That(pointer[0].ToString(), Is.EqualTo("foo~bar"));
+    }
+
+    [Test]
+    public void SegmentToString_DecodesPattern_Issue1055()
+    {
+        var pointer = JsonPointer.Parse("/patternProperties/^(~1[^~1]+)+$");
+
+        Assert.That(pointer[1].ToString(), Is.EqualTo("^(/[^/]+)+$"));
+    }
+
+    [Test]
     public void SegmentAsSpan()
     {
         var pointer = JsonPointer.Parse("/foo/bar");

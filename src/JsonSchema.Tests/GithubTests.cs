@@ -1485,4 +1485,25 @@ public class GithubTests
 		Assert.Null(result.Details[0].Details[0].Errors);
 		Assert.NotNull(result.Details[0].Errors["not"]);
 	}
+
+	[Test]
+	public void Issue1055_PatternPropertiesWithSlashInPattern()
+	{
+		var schemaJson = """
+			{
+			  "$schema": "http://json-schema.org/draft-07/schema#",
+			  "type": "object",
+			  "patternProperties": {
+			    "^(/[^/]+)+$": { "$ref": "#/definitions/entry" }
+			  },
+			  "definitions": {
+			    "entry": {}
+			  }
+			}
+			""";
+		var schema = JsonSchema.FromText(schemaJson);
+		var instance = JsonDocument.Parse("""{ "/foo": 1 }""").RootElement;
+
+		Assert.DoesNotThrow(() => schema.Evaluate(instance));
+	}
 }
