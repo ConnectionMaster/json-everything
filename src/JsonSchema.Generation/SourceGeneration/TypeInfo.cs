@@ -22,6 +22,7 @@ internal sealed class TypeInfo
 	public List<ConditionalInfo> Conditionals { get; init; } = new();
 	public List<AttributeInfo>? ItemAttributes { get; init; }
 	public List<AttributeInfo>? PropertyAttributes { get; init; }
+	public string? ExplicitSchemaExpression { get; set; }
 }
 
 internal sealed class PropertyInfo

@@ -4,6 +4,7 @@ using System.Linq;
 using Json.Schema.Generation.Serialization;
 using Json.Schema.Generation.SourceGeneration.Emitters;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Json.Schema.Generation.SourceGeneration;
 
@@ -66,6 +67,18 @@ internal static class TypeAnalyzer
 			XmlDocSummary = GetXmlDocSummary(typeSymbol)
 		};
 
+		ExtractAttributes(compilation, typeSymbol.GetAttributes(), typeInfo.TypeAttributes);
+
+		if (typeKind is TypeKind.Object or TypeKind.Enum)
+		{
+			var explicitExpression = ExtractExplicitSchemaExpression(typeSymbol);
+			if (explicitExpression != null)
+			{
+				typeInfo.ExplicitSchemaExpression = explicitExpression;
+				return typeInfo;
+			}
+		}
+
 		switch (typeKind)
 		{
 			case TypeKind.Object:
@@ -78,12 +91,41 @@ internal static class TypeAnalyzer
 				break;
 		}
 
-		ExtractAttributes(compilation, typeSymbol.GetAttributes(), typeInfo.TypeAttributes);
-
 		if (typeKind == TypeKind.Object)
 			AnalyzeConditionals(typeInfo);
 
 		return typeInfo;
+	}
+
+	private const string _jsonSchemaAttributeName = "Json.Schema.Serialization.JsonSchemaAttribute";
+
+	private static string? ExtractExplicitSchemaExpression(INamedTypeSymbol typeSymbol)
+	{
+		var attr = typeSymbol.GetAttributes()
+			.FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == _jsonSchemaAttributeName);
+		if (attr == null) return null;
+		if (attr.ConstructorArguments.Length < 2) return null;
+		if (attr.ConstructorArguments[0].Value is not INamedTypeSymbol declaringType) return null;
+		if (attr.ConstructorArguments[1].Value is not string memberName) return null;
+
+		var member = declaringType.GetMembers(memberName).FirstOrDefault(m => m.IsStatic);
+		var syntaxRef = member?.DeclaringSyntaxReferences.FirstOrDefault();
+		if (syntaxRef == null) return null;
+
+		var syntax = syntaxRef.GetSyntax();
+		var expression = syntax switch
+		{
+			VariableDeclaratorSyntax varDecl => varDecl.Initializer?.Value?.ToFullString().Trim(),
+			PropertyDeclarationSyntax propDecl => propDecl.Initializer?.Value?.ToFullString().Trim()
+			                                      ?? propDecl.ExpressionBody?.Expression?.ToFullString().Trim(),
+			_ => null
+		};
+
+		if (expression == null) return null;
+		if (expression.EndsWith(".Build()"))
+			expression = expression[..^".Build()".Length].TrimEnd();
+
+		return expression;
 	}
 
 	private static TypeKind DetermineTypeKind(ITypeSymbol typeSymbol)

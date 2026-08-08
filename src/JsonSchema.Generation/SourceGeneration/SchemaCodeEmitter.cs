@@ -628,6 +628,17 @@ internal static class SchemaCodeEmitter
 		}
 
 		sb.Append($"\tpublic static readonly JsonSchema {GetPropertyName(type)} = ");
+
+		if (type.ExplicitSchemaExpression != null)
+		{
+			var schemaId = GetSchemaId(type);
+			sb.Append(type.ExplicitSchemaExpression);
+			sb.AppendLine();
+			sb.AppendLine($"\t\t.Id(\"{schemaId}\").Build();");
+			sb.AppendLine();
+			return;
+		}
+
 		EmitSchemaBuilder(sb, type, 2, typeIds, schemaHandlers);
 		sb.AppendLine(".Build();");
 		sb.AppendLine();

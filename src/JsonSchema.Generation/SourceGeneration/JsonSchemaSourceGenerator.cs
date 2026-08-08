@@ -270,7 +270,7 @@ public class JsonSchemaSourceGenerator : IIncrementalGenerator
 			{
 				// Analyze the type to collect its properties' types
 				var tempTypeInfo = TypeAnalyzer.Analyze(compilation, namedType, null, reportDiagnostic, naming, order);
-				if (tempTypeInfo != null)
+				if (tempTypeInfo != null && tempTypeInfo.ExplicitSchemaExpression == null)
 				{
 					foreach (var prop in tempTypeInfo.Properties)
 					{

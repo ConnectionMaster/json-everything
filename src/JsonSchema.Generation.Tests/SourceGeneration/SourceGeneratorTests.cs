@@ -1402,5 +1402,82 @@ public class SourceGeneratorTests
 		Assert.That(actual.Root.Source.TryGetProperty("unevaluatedProperties", out _), Is.False);
 		Assert.That(actual.Root.Source.TryGetProperty("additionalProperties", out _), Is.False);
 	}
-}
 
+	[Test]
+	public void ExplicitSchemaType_UsesExtractedExpression()
+	{
+		var expectedJson = """
+		{
+		  "$id": "urn:jsonschema:Json.Schema.Generation.Tests.SourceGeneration.TestModels.ExplicitSchemaType",
+		  "type": "string"
+		}
+		""";
+		var expected = JsonSchema.FromText(expectedJson, new BuildOptions { SchemaRegistry = new SchemaRegistry() });
+		var actual = GeneratedJsonSchemas.TestModels_ExplicitSchemaType;
+
+		AssertEqual(expected, actual);
+	}
+
+	[Test]
+	public void TypeReferencingExplicitSchema_RefsExplicitSchema()
+	{
+		var expectedJson = """
+		{
+		  "$schema": "https://json-schema.org/draft/2020-12/schema",
+		  "$id": "urn:jsonschema:Json.Schema.Generation.Tests.SourceGeneration.TestModels.TypeReferencingExplicitSchema",
+		  "type": "object",
+		  "properties": {
+		    "Company": { "$ref": "urn:jsonschema:Json.Schema.Generation.Tests.SourceGeneration.TestModels.ExplicitSchemaType" }
+		  }
+		}
+		""";
+		var expected = JsonSchema.FromText(expectedJson, new BuildOptions { SchemaRegistry = new SchemaRegistry() });
+		var actual = GeneratedJsonSchemas.TestModels_TypeReferencingExplicitSchema;
+
+		AssertEqual(expected, actual);
+	}
+
+	[Test]
+	public void TypeWithNullableExplicitSchemaRef_EmitsNullableAnyOf()
+	{
+		var expectedJson = """
+		{
+		  "$schema": "https://json-schema.org/draft/2020-12/schema",
+		  "$id": "urn:jsonschema:Json.Schema.Generation.Tests.SourceGeneration.TestModels.TypeWithNullableExplicitSchemaRef",
+		  "type": "object",
+		  "properties": {
+		    "Company": {
+		      "anyOf": [
+		        { "$ref": "urn:jsonschema:Json.Schema.Generation.Tests.SourceGeneration.TestModels.ExplicitSchemaType" },
+		        { "type": "null" }
+		      ]
+		    }
+		  }
+		}
+		""";
+		var expected = JsonSchema.FromText(expectedJson, new BuildOptions { SchemaRegistry = new SchemaRegistry() });
+		var actual = GeneratedJsonSchemas.TestModels_TypeWithNullableExplicitSchemaRef;
+
+		AssertEqual(expected, actual);
+	}
+
+	[Test]
+	public void TypeWithRequiredExplicitSchemaRef_RequiresProperty()
+	{
+		var expectedJson = """
+		{
+		  "$schema": "https://json-schema.org/draft/2020-12/schema",
+		  "$id": "urn:jsonschema:Json.Schema.Generation.Tests.SourceGeneration.TestModels.TypeWithRequiredExplicitSchemaRef",
+		  "type": "object",
+		  "properties": {
+		    "Company": { "$ref": "urn:jsonschema:Json.Schema.Generation.Tests.SourceGeneration.TestModels.ExplicitSchemaType" }
+		  },
+		  "required": ["Company"]
+		}
+		""";
+		var expected = JsonSchema.FromText(expectedJson, new BuildOptions { SchemaRegistry = new SchemaRegistry() });
+		var actual = GeneratedJsonSchemas.TestModels_TypeWithRequiredExplicitSchemaRef;
+
+		AssertEqual(expected, actual);
+	}
+}
