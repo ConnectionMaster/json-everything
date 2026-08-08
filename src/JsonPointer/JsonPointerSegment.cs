@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 
 namespace Json.Pointer;
 
@@ -162,11 +163,54 @@ public readonly ref struct JsonPointerSegment
     public override int GetHashCode() => _segment.GetHashCode();
 #pragma warning restore CS0809 // Obsolete member overrides non-obsolete member
 
-    /// <summary>
-    /// Returns the string representation of this segment.
-    /// </summary>
-    /// <returns>The segment as a string.</returns>
-    public override string ToString() => _segment.ToString();
+	/// <summary>
+	/// Returns the string representation of this segment.
+	/// </summary>
+	/// <returns>The segment as a string.</returns>
+	public override string ToString()
+	{
+		if (_segment.IndexOf('~') == -1) return _segment.ToString();
+
+		if (_segment.Length <= 256)
+		{
+			Span<char> buf = stackalloc char[_segment.Length];
+			var len = Decode(_segment, buf);
+#if NET8_0_OR_GREATER
+			return new string(buf[..len]);
+#else
+			return buf[..len].ToString();
+#endif
+		}
+
+		char[]? rented = null;
+		try
+		{
+			rented = ArrayPool<char>.Shared.Rent(_segment.Length);
+			var len = Decode(_segment, rented.AsSpan(0, _segment.Length));
+			return new string(rented, 0, len);
+		}
+		finally
+		{
+			if (rented != null)
+				ArrayPool<char>.Shared.Return(rented);
+		}
+	}
+
+	private static int Decode(ReadOnlySpan<char> source, Span<char> dest)
+	{
+		var len = 0;
+		for (var i = 0; i < source.Length; i++)
+		{
+			if (source[i] == '~' && i + 1 < source.Length)
+			{
+				if (source[i + 1] == '1') { dest[len++] = '/'; i++; }
+				else if (source[i + 1] == '0') { dest[len++] = '~'; i++; }
+				else dest[len++] = source[i];
+			}
+			else dest[len++] = source[i];
+		}
+		return len;
+	}
 
     /// <summary>
     /// Returns the int representation of this segment.

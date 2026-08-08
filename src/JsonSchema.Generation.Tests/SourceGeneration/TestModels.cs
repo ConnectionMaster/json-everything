@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Json.Schema.Generation.Serialization;
+using Json.Schema.Serialization;
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
 namespace Json.Schema.Generation.Tests.SourceGeneration;
@@ -604,5 +605,34 @@ public static class TestModels
 		[Title("title")]
 		[Description("description")]
 		public string Metadata { get; set; }
+	}
+
+#pragma warning disable IL2026
+	[JsonSchema(typeof(ExplicitSchemaType), nameof(Schema))]
+	public class ExplicitSchemaType
+	{
+		public static readonly JsonSchema Schema = new JsonSchemaBuilder().Type(SchemaValueType.String);
+		public string Value { get; set; } = string.Empty;
+	}
+
+#pragma warning restore IL2026
+
+	[GenerateJsonSchema]
+	public class TypeReferencingExplicitSchema
+	{
+		public ExplicitSchemaType Company { get; set; } = new();
+	}
+
+	[GenerateJsonSchema]
+	public class TypeWithNullableExplicitSchemaRef
+	{
+		public ExplicitSchemaType? Company { get; set; }
+	}
+
+	[GenerateJsonSchema]
+	public class TypeWithRequiredExplicitSchemaRef
+	{
+		[Required]
+		public ExplicitSchemaType Company { get; set; } = new();
 	}
 }
